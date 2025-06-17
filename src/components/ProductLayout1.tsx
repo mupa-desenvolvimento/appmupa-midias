@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Product } from '../types';
 import { getMupaToken, getProductImageAndColors } from '../lib/api/mupaImage';
@@ -7,10 +8,9 @@ interface ProductLayout1Props {
 }
 
 const ProductLayout1 = ({ product }: ProductLayout1Props) => {
-  const [bgColor, setBgColor] = useState<string>('#f5a623');
-  const [accentColor, setAccentColor] = useState<string>('#eab308');
-  const [darkColor, setDarkColor] = useState<string>('#3a2200');
-  const [gradient, setGradient] = useState<string>('');
+  const [bgColor, setBgColor] = useState<string>('#FF8C00');
+  const [accentColor, setAccentColor] = useState<string>('#FFB347');
+  const [darkColor, setDarkColor] = useState<string>('#8B4513');
   const [imageUrl, setImageUrl] = useState<string>(product.imageUrl);
 
   useEffect(() => {
@@ -25,16 +25,13 @@ const ProductLayout1 = ({ product }: ProductLayout1Props) => {
         if (data.cores && data.cores.length > 0) {
           setBgColor(data.cores[0]);
           setAccentColor(data.cores[1] || data.cores[0]);
-          setDarkColor(data.cores[data.cores.length - 1] || '#3a2200');
-          // Monta um degradê bonito usando as duas primeiras cores
-          setGradient(`linear-gradient(120deg, ${data.cores[0]} 60%, ${data.cores[1] || data.cores[0]} 100%)`);
+          setDarkColor(data.cores[data.cores.length - 1] || '#8B4513');
         }
       } catch (e) {
         setImageUrl(product.imageUrl);
-        setBgColor('#f5a623');
-        setAccentColor('#eab308');
-        setDarkColor('#3a2200');
-        setGradient('linear-gradient(120deg, #f5a623 60%, #eab308 100%)');
+        setBgColor('#FF8C00');
+        setAccentColor('#FFB347');
+        setDarkColor('#8B4513');
         console.warn('Erro ao buscar imagem/cores Mupa:', e);
       }
     }
@@ -50,36 +47,87 @@ const ProductLayout1 = ({ product }: ProductLayout1Props) => {
   const [reais, centavos] = price.split(',');
 
   return (
-    <div className="w-full h-full flex flex-row items-stretch p-0 rounded-none shadow-none border-0 overflow-hidden" style={{ background: gradient || bgColor }}>
-      {/* Área de informações */}
-      <div className="flex flex-col justify-center p-16 gap-8 min-w-0 w-1/2">
+    <div 
+      className="w-full h-full flex flex-row items-center justify-between p-16 overflow-hidden"
+      style={{ backgroundColor: bgColor }}
+    >
+      {/* Área de informações à esquerda */}
+      <div className="flex flex-col justify-center flex-1 pr-16">
         {/* Descrição grande */}
-        <div className="text-4xl font-extrabold leading-tight text-white mb-8" style={{ textShadow: 'none', letterSpacing: 1, lineHeight: 1.1 }}>
+        <div 
+          className="text-5xl font-black leading-tight mb-12 tracking-wider"
+          style={{ 
+            color: '#FFFFFF',
+            textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+            lineHeight: '1.1',
+            maxWidth: '600px'
+          }}
+        >
           {description}
         </div>
+        
         {/* Preço destacado */}
         <div
-          className="inline-block px-12 py-6 rounded-2xl mb-8"
-          style={{ background: darkColor, color: '#fff', minWidth: 340, textAlign: 'left' }}
+          className="inline-block rounded-2xl px-8 py-6 shadow-2xl"
+          style={{ 
+            backgroundColor: darkColor,
+            maxWidth: 'fit-content'
+          }}
         >
-          <span className="text-3xl align-top font-light mr-2" style={{ verticalAlign: 'top' }}>R$</span>
-          <span className="text-8xl font-extrabold align-middle leading-none" style={{ verticalAlign: 'middle' }}>{reais}</span>
-          <span className="text-3xl font-bold align-baseline ml-1" style={{ verticalAlign: 'baseline' }}>,{centavos}</span>
+          <div className="flex items-baseline">
+            <span 
+              className="text-3xl font-medium mr-2"
+              style={{ color: '#FFFFFF' }}
+            >
+              R$
+            </span>
+            <span 
+              className="text-8xl font-black leading-none"
+              style={{ color: '#FFFFFF' }}
+            >
+              {reais}
+            </span>
+            <span 
+              className="text-4xl font-bold ml-1"
+              style={{ color: '#FFFFFF' }}
+            >
+              ,{centavos}
+            </span>
+          </div>
         </div>
+        
         {/* Código */}
-        <div className="text-lg text-white/80 mt-8">Código: {product.barcode}</div>
+        <div 
+          className="text-lg mt-8 font-medium"
+          style={{ color: 'rgba(255,255,255,0.9)' }}
+        >
+          Código: {product.barcode}
+        </div>
       </div>
-      {/* Área da imagem */}
-      <div className="flex items-center justify-center flex-shrink-0 w-1/2 h-full min-h-[400px] bg-transparent">
+
+      {/* Área da imagem à direita */}
+      <div className="flex items-center justify-center flex-shrink-0" style={{ width: '45%' }}>
         {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={product.name}
-            className="object-contain max-h-[80vh] max-w-[90%] mx-auto bg-transparent"
-            style={{ background: 'transparent', display: 'block', margin: '0 auto' }}
-          />
+          <div className="relative">
+            <img
+              src={imageUrl}
+              alt={product.name}
+              className="object-contain shadow-2xl rounded-xl"
+              style={{ 
+                maxHeight: '70vh',
+                maxWidth: '100%',
+                filter: 'drop-shadow(4px 4px 12px rgba(0,0,0,0.3))'
+              }}
+            />
+          </div>
         ) : (
-          <div className="w-64 h-64 flex items-center justify-center bg-gray-200 rounded-2xl text-gray-400 text-xl">
+          <div 
+            className="w-80 h-80 flex items-center justify-center rounded-2xl text-xl font-semibold shadow-2xl"
+            style={{ 
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              color: '#FFFFFF'
+            }}
+          >
             Imagem não disponível
           </div>
         )}
