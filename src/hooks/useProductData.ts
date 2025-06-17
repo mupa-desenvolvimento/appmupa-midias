@@ -2,92 +2,128 @@
 import { useState } from 'react';
 import { Product } from '../types';
 
-const mockProducts: Record<string, Product> = {
-  '7891000100103': {
-    id: '1',
-    barcode: '7891000100103',
-    name: 'Coca-Cola Lata 350ml',
-    description: 'Refrigerante Coca-Cola Original Lata 350ml',
-    imageUrl: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=400&h=400&fit=crop',
-    normalPrice: 3.50,
-    promotionalPrice: 2.99,
-    isOnSale: true,
-    unit: 'un',
-    expiryDate: '2024-12-31',
-    additionalInfo: 'Gelada e refrescante'
-  },
-  '1234567890123': {
-    id: '2',
-    barcode: '1234567890123',
-    name: 'Pão Integral 500g',
-    description: 'Pão integral com fibras, rico em nutrientes',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop',
-    normalPrice: 4.50,
-    isOnSale: false,
-    unit: 'un',
-    expiryDate: '2024-06-20',
-    additionalInfo: 'Rico em fibras'
-  },
-  '7891234567890': {
-    id: '3',
-    barcode: '7891234567890',
-    name: 'Leite Integral 1L',
-    description: 'Leite integral pasteurizado tipo A',
-    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&h=400&fit=crop',
-    normalPrice: 5.99,
-    promotionalPrice: 4.99,
-    isOnSale: true,
-    unit: 'un',
-    expiryDate: '2024-06-25',
-    additionalInfo: 'Fonte de cálcio'
-  },
-  // Código fictício para teste
-  '12345678': {
-    id: '4',
-    barcode: '12345678',
-    name: 'Produto Teste',
-    description: 'Produto para teste do terminal',
-    imageUrl: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop',
-    normalPrice: 10.00,
-    promotionalPrice: 7.99,
-    isOnSale: true,
-    unit: 'un',
-    additionalInfo: 'Produto fictício para demonstração'
-  },
-  '87654321': {
-    id: '5',
-    barcode: '87654321',
-    name: 'Outro Produto Teste',
-    description: 'Segundo produto para teste',
-    imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop',
-    normalPrice: 15.50,
-    isOnSale: false,
-    unit: 'un',
-    additionalInfo: 'Segundo produto fictício'
-  }
-};
+interface ZaffariProduct {
+  codigo_etiqueta: string;
+  codigo_produto: string;
+  descricao_produto: string;
+  ean: string;
+  embalagem_proporcional: string;
+  embalagem_venda: string;
+  link_imagem: string;
+  loja: string;
+  media_venda: string;
+  preco_base: string;
+  preco_prop_sellprice: string;
+  status_venda: string;
+}
+
+interface ZaffariResponse {
+  success: boolean;
+  data: ZaffariProduct;
+}
+
+interface LoginResponse {
+  token?: string;
+  access_token?: string;
+}
 
 export const useProductData = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  const authenticate = async (): Promise<string | null> => {
+    try {
+      const response = await fetch('https://zaffariexpress.com.br/api/login/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          usuario: 'mupa',
+          password: '7hDD$%k*WJrY%4sQQY9G'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha na autenticação');
+      }
+
+      const data: LoginResponse = await response.json();
+      const authToken = data.token || data.access_token;
+      
+      if (authToken) {
+        setToken(authToken);
+        return authToken;
+      }
+      
+      throw new Error('Token não encontrado na resposta');
+    } catch (err) {
+      console.error('Erro na autenticação:', err);
+      return null;
+    }
+  };
 
   const getProduct = async (barcode: string): Promise<Product | null> => {
     setLoading(true);
     setError(null);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Usar token existente ou fazer nova autenticação
+      let currentToken = token;
+      if (!currentToken) {
+        currentToken = await authenticate();
+        if (!currentToken) {
+          setError('Erro na autenticação');
+          return null;
+        }
+      }
+
+      const response = await fetch(
+        `https://zaffariexpress.com.br/api/v1/consultapreco/precos?loja=51&ean=${barcode}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${currentToken}`,
+          }
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // Token expirado, tentar nova autenticação
+          const newToken = await authenticate();
+          if (newToken) {
+            return getProduct(barcode); // Tentar novamente com novo token
+          }
+        }
+        throw new Error('Produto não encontrado');
+      }
+
+      const result: ZaffariResponse = await response.json();
       
-      const product = mockProducts[barcode];
-      
-      if (!product) {
+      if (!result.success || !result.data) {
         setError('Produto não encontrado');
         return null;
       }
 
+      const zaffariProduct = result.data;
+      
+      // Converter para o formato interno
+      const product: Product = {
+        id: zaffariProduct.codigo_produto,
+        barcode: zaffariProduct.ean,
+        name: zaffariProduct.descricao_produto,
+        description: zaffariProduct.descricao_produto,
+        imageUrl: zaffariProduct.link_imagem || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop',
+        normalPrice: parseFloat(zaffariProduct.preco_base),
+        isOnSale: false,
+        unit: zaffariProduct.embalagem_venda || 'un',
+        additionalInfo: `Código: ${zaffariProduct.codigo_produto}`
+      };
+
       return product;
     } catch (err) {
+      console.error('Erro ao consultar produto:', err);
       setError('Erro ao consultar produto');
       return null;
     } finally {

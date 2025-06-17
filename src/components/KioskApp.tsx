@@ -37,6 +37,7 @@ const KioskApp = () => {
 
   const handleConfigSave = (newConfig: AppConfig) => {
     setConfig(newConfig);
+    console.log('Config salva:', newConfig); // Debug
     switchToMedia();
   };
 
@@ -63,22 +64,27 @@ const KioskApp = () => {
     return <ConfigScreen isActive={true} onConfigSave={handleConfigSave} />;
   }
 
+  console.log('Layout ativo:', config.activeLayout); // Debug
+
   return (
     <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
       {/* Input visível para testes */}
-      <div className="fixed top-4 left-4 z-50 bg-white p-2 rounded">
+      <div className="fixed top-4 left-4 z-50 bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg">
         <input
           ref={inputRef}
           type="text"
           placeholder="Digite código de barras e Enter"
           onChange={handleBarcodeInput}
           onKeyDown={handleKeyDown}
-          className="border border-gray-300 px-2 py-1 rounded text-black"
+          className="border border-gray-300 px-3 py-2 rounded text-black w-64"
           autoFocus
           tabIndex={0}
         />
-        <div className="text-xs text-gray-600 mt-1">
-          Códigos teste: 12345678, 87654321
+        <div className="text-xs text-gray-600 mt-2">
+          Códigos teste: 12345678, 87654321, 7896115700392
+        </div>
+        <div className="text-xs text-blue-600 mt-1">
+          Layout ativo: {config.activeLayout}
         </div>
       </div>
 

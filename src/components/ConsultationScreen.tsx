@@ -48,9 +48,11 @@ const ConsultationScreen = ({ isActive, onTimeout, layout, barcode }: Consultati
   };
 
   const renderProductLayout = (product: Product) => {
+    console.log('Renderizando layout:', layout);
     switch (layout) {
       case 2:
         return <ProductLayout2 product={product} />;
+      case 1:
       default:
         return <ProductLayout1 product={product} />;
     }
@@ -59,26 +61,28 @@ const ConsultationScreen = ({ isActive, onTimeout, layout, barcode }: Consultati
   if (!isActive) return null;
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 flex items-center justify-center">
       {loading && (
         <div className="text-center space-y-8">
-          <div className="flex items-center justify-center space-x-3 text-blue-600">
-            <Loader2 className="w-12 h-12 animate-spin" />
-            <span className="text-2xl">Buscando produto...</span>
+          <div className="flex items-center justify-center space-x-4 text-blue-600 bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-2xl">
+            <Loader2 className="w-16 h-16 animate-spin text-blue-500" />
+            <span className="text-3xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Buscando produto...
+            </span>
           </div>
         </div>
       )}
 
       {error && !loading && (
         <div className="text-center space-y-8">
-          <div className="flex items-center justify-center space-x-3 text-red-600 bg-red-50 p-6 rounded-xl">
-            <AlertCircle className="w-8 h-8" />
-            <span className="text-xl">{error}</span>
+          <div className="flex items-center justify-center space-x-4 text-red-600 bg-red-50/90 backdrop-blur-sm p-8 rounded-2xl shadow-2xl border border-red-200">
+            <AlertCircle className="w-10 h-10 text-red-500" />
+            <span className="text-2xl font-semibold">{error}</span>
           </div>
           <Button 
             onClick={handleNewScan}
             size="lg"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-4 text-xl rounded-xl"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-12 py-4 text-xl rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
           >
             Voltar
           </Button>
@@ -87,7 +91,7 @@ const ConsultationScreen = ({ isActive, onTimeout, layout, barcode }: Consultati
 
       {product && !loading && (
         <div className="w-full h-full flex flex-col">
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center p-4">
             {renderProductLayout(product)}
           </div>
           
@@ -95,7 +99,7 @@ const ConsultationScreen = ({ isActive, onTimeout, layout, barcode }: Consultati
             <Button 
               onClick={handleNewScan}
               size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-4 text-xl rounded-xl"
+              className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white px-12 py-4 text-xl rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
             >
               <Package className="w-6 h-6 mr-3" />
               Consultar Outro Produto
