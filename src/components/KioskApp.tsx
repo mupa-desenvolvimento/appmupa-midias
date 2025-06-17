@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 const KioskApp = () => {
   const { mode, switchToConsultation, switchToMedia, switchToConfig } = useAppMode();
   const [config, setConfig] = useState<AppConfig | null>(null);
+  const [scannedBarcode, setScannedBarcode] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -21,11 +22,6 @@ const KioskApp = () => {
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
     
-    // Try to enter fullscreen mode
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(console.log);
-    }
-
     return () => {
       document.removeEventListener('contextmenu', e => e.preventDefault());
       document.removeEventListener('selectstart', e => e.preventDefault());
@@ -34,7 +30,7 @@ const KioskApp = () => {
 
   useEffect(() => {
     // Always keep focus on input for barcode scanning
-    if (mode === 'media' && inputRef.current) {
+    if (inputRef.current) {
       inputRef.current.focus();
     }
   }, [mode]);
@@ -46,16 +42,16 @@ const KioskApp = () => {
 
   const handleBarcodeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value.length >= 8) {
-      switchToConsultation();
-      e.target.value = '';
-    }
+    console.log('Input value:', value);
+    setScannedBarcode(value);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const value = (e.target as HTMLInputElement).value;
-      if (value.length >= 8) {
+      console.log('Enter pressed with value:', value);
+      if (value.length >= 4) {
+        setScannedBarcode(value);
         switchToConsultation();
         (e.target as HTMLInputElement).value = '';
       }
@@ -69,16 +65,22 @@ const KioskApp = () => {
 
   return (
     <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
-      {/* Input invisível para leitura de código de barras */}
-      <input
-        ref={inputRef}
-        type="text"
-        onChange={handleBarcodeInput}
-        onKeyDown={handleKeyDown}
-        className="absolute -left-full opacity-0 pointer-events-none"
-        autoFocus
-        tabIndex={0}
-      />
+      {/* Input visível para testes */}
+      <div className="fixed top-4 left-4 z-50 bg-white p-2 rounded">
+        <input
+          ref={inputRef}
+          type="text"
+          placeholder="Digite código de barras e Enter"
+          onChange={handleBarcodeInput}
+          onKeyDown={handleKeyDown}
+          className="border border-gray-300 px-2 py-1 rounded text-black"
+          autoFocus
+          tabIndex={0}
+        />
+        <div className="text-xs text-gray-600 mt-1">
+          Códigos teste: 12345678, 87654321
+        </div>
+      </div>
 
       {/* Media Player */}
       <MediaPlayer isActive={mode === 'media'} />
@@ -88,6 +90,7 @@ const KioskApp = () => {
         isActive={mode === 'consultation'} 
         onTimeout={switchToMedia}
         layout={config.activeLayout}
+        barcode={scannedBarcode}
       />
 
       {/* Config Screen */}
