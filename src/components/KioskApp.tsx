@@ -12,26 +12,35 @@ const KioskApp = () => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [scannedBarcode, setScannedBarcode] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isConfigScreen, setIsConfigScreen] = useState(false);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [barcodeValue, setBarcodeValue] = useState('');
 
+  // Foca o input após interação do usuário
   useEffect(() => {
-    // Prevent context menu and selection
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('selectstart', e => e.preventDefault());
-    
-    // Remove scrollbars and ensure full screen
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    
+    if (!isConfigScreen && hasUserInteracted && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isConfigScreen, hasUserInteracted]);
+
+  // Marca que o usuário interagiu (primeiro clique/tap)
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      setHasUserInteracted(true);
+    };
+    document.addEventListener('click', handleUserInteraction, { once: true });
+    document.addEventListener('touchstart', handleUserInteraction, { once: true });
     return () => {
-      document.removeEventListener('contextmenu', e => e.preventDefault());
-      document.removeEventListener('selectstart', e => e.preventDefault());
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
     };
   }, []);
 
   useEffect(() => {
-    // Always keep focus on input for barcode scanning
-    if (inputRef.current) {
-      inputRef.current.focus();
+    if (mode === 'config') {
+      setIsConfigScreen(true);
+    } else {
+      setIsConfigScreen(false);
     }
   }, [mode]);
 
@@ -42,22 +51,26 @@ const KioskApp = () => {
   };
 
   const handleBarcodeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    console.log('Input value:', value);
-    setScannedBarcode(value);
+    setBarcodeValue(e.target.value);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const value = (e.target as HTMLInputElement).value;
-      console.log('Enter pressed with value:', value);
       if (value.length >= 4) {
         setScannedBarcode(value);
         switchToConsultation();
-        (e.target as HTMLInputElement).value = '';
+        setBarcodeValue(''); // Limpa o input
       }
     }
   };
+
+  // Foco automático sempre que não estiver na tela de configuração
+  useEffect(() => {
+    if (!isConfigScreen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isConfigScreen, mode]);
 
   // Show config screen if not configured
   if (!config) {
@@ -68,28 +81,35 @@ const KioskApp = () => {
 
   return (
     <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
-      {/* Input visível para testes */}
-      <div className="fixed top-4 left-4 z-50 bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg">
-        <input
-          ref={inputRef}
-          type="text"
-          placeholder="Digite código de barras e Enter"
-          onChange={handleBarcodeInput}
-          onKeyDown={handleKeyDown}
-          className="border border-gray-300 px-3 py-2 rounded text-black w-64"
-          autoFocus
-          tabIndex={0}
-        />
-        <div className="text-xs text-gray-600 mt-2">
-          Códigos teste: 12345678, 87654321, 7896115700392
-        </div>
-        <div className="text-xs text-blue-600 mt-1">
-          Layout ativo: {config.activeLayout}
-        </div>
-      </div>
+      {/* Input invisível para leitura de código de barras */}
+      <input
+        ref={inputRef}
+        id="input_barcode"
+        type="text"
+        value={barcodeValue}
+        onChange={handleBarcodeInput}
+        onKeyDown={handleBarcodeKeyDown}
+        autoFocus
+        tabIndex={0}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: '1px',
+          height: '1px',
+          opacity: 0,
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+        aria-hidden="true"
+      />
 
       {/* Media Player */}
-      <MediaPlayer isActive={mode === 'media'} />
+      <MediaPlayer 
+        isActive={mode === 'media'}
+        mediaId="1700411533483x832110738923847700"
+        token="9c264e50ddb95a215b446412a3b42b58"
+      />
 
       {/* Consultation Screen */}
       <ConsultationScreen 

@@ -1,38 +1,36 @@
-
 import { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { useProductData } from '../hooks/useProductData';
-import ProductLayout1 from './ProductLayout1';
-import ProductLayout2 from './ProductLayout2';
 import { Button } from '@/components/ui/button';
 import { Loader2, Package, AlertCircle } from 'lucide-react';
+import { extractBrand } from '../lib/utils';
+import ProductLayout1 from './ProductLayout1';
+import ProductLayout2 from './ProductLayout2';
 
 interface ConsultationScreenProps {
   isActive: boolean;
   onTimeout: () => void;
-  layout: number;
   barcode: string;
+  layout: number;
 }
 
-const ConsultationScreen = ({ isActive, onTimeout, layout, barcode }: ConsultationScreenProps) => {
+const ConsultationScreen = ({ isActive, onTimeout, barcode, layout }: ConsultationScreenProps) => {
   const { loading, error, getProduct } = useProductData();
   const [product, setProduct] = useState<Product | null>(null);
+  const [brand, setBrand] = useState<string | null>(null);
 
   useEffect(() => {
     if (isActive && barcode) {
-      console.log('Consultando produto com código:', barcode);
       handleProductLookup(barcode);
     }
   }, [isActive, barcode]);
 
   useEffect(() => {
     if (isActive && !loading && (product || error)) {
-      // Auto return to media after 10 seconds
       const timer = setTimeout(() => {
         onTimeout();
         setProduct(null);
       }, 10000);
-
       return () => clearTimeout(timer);
     }
   }, [isActive, loading, product, error, onTimeout]);
@@ -40,15 +38,20 @@ const ConsultationScreen = ({ isActive, onTimeout, layout, barcode }: Consultati
   const handleProductLookup = async (code: string) => {
     const productData = await getProduct(code);
     setProduct(productData);
+    if (productData) {
+      setBrand(extractBrand(productData.name || productData.description || ''));
+    }
   };
 
   const handleNewScan = () => {
     setProduct(null);
+    setBrand(null);
     onTimeout();
   };
 
+  if (!isActive) return null;
+
   const renderProductLayout = (product: Product) => {
-    console.log('Renderizando layout:', layout);
     switch (layout) {
       case 2:
         return <ProductLayout2 product={product} />;
@@ -58,10 +61,8 @@ const ConsultationScreen = ({ isActive, onTimeout, layout, barcode }: Consultati
     }
   };
 
-  if (!isActive) return null;
-
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 flex items-center justify-center">
+    <div className="fixed inset-0 w-screen h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-indigo-200 flex items-center justify-center p-0 m-0">
       {loading && (
         <div className="text-center space-y-8">
           <div className="flex items-center justify-center space-x-4 text-blue-600 bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-2xl">
@@ -90,21 +91,8 @@ const ConsultationScreen = ({ isActive, onTimeout, layout, barcode }: Consultati
       )}
 
       {product && !loading && (
-        <div className="w-full h-full flex flex-col">
-          <div className="flex-1 flex items-center justify-center p-4">
-            {renderProductLayout(product)}
-          </div>
-          
-          <div className="p-8 text-center">
-            <Button 
-              onClick={handleNewScan}
-              size="lg"
-              className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white px-12 py-4 text-xl rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <Package className="w-6 h-6 mr-3" />
-              Consultar Outro Produto
-            </Button>
-          </div>
+        <div className="w-full h-full flex flex-col items-center justify-center p-0 m-0">
+          {renderProductLayout(product)}
         </div>
       )}
     </div>

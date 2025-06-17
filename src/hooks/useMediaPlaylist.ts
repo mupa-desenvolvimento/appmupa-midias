@@ -1,6 +1,8 @@
-
 import { useState, useEffect } from 'react';
 import { MediaItem } from '../types';
+import { fetchMedias } from '../lib/api/medias';
+import { database } from '../lib/firebase';
+import { ref, onValue, off } from 'firebase/database';
 
 const mockPlaylist: MediaItem[] = [
   {
@@ -45,43 +47,115 @@ const mockPlaylist: MediaItem[] = [
   }
 ];
 
-export const useMediaPlaylist = () => {
-  const [playlist, setPlaylist] = useState<MediaItem[]>(mockPlaylist);
+export const useMediaPlaylist = (options?: { mediaId?: string, token?: string }) => {
+  const [playlist, setPlaylist] = useState<MediaItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [updateMessage, setUpdateMessage] = useState<string>('');
 
   const currentMedia = playlist[currentIndex];
 
-  const nextMedia = () => {
-    setCurrentIndex((prev) => (prev + 1) % playlist.length);
+  // Função para buscar mídias
+  const getMedias = async () => {
+    if (!options?.mediaId || !options?.token) return;
+
+    const now = new Date();
+    const hour = now.getHours();
+    if (hour < 6 || hour > 22) {
+      console.log('Fora do horário de atualização de mídias (6h-22h)');
+      return;
+    }
+
+    try {
+      setUpdateMessage('Atualizando lista de mídias...');
+      const data = await fetchMedias({ _id: options.mediaId, token: options.token });
+      console.log('Resposta da API de mídias:', data);
+      
+      if (data?.response?.medias && Array.isArray(data.response.medias) && data.response.medias.length > 0) {
+        const items: MediaItem[] = data.response.medias.map((item: any) => ({
+          id: item._id || item.id || String(Math.random()),
+          type: item.type || 'image',
+          url: item.link || item.final || item.url,
+          duration: (item.time || 8) * 1000,
+          title: item.nome || '',
+          order: item.order || 1
+        }));
+
+        console.log('Items processados:', items);
+        setPlaylist(items);
+        setCurrentIndex(0);
+        setUpdateMessage('Lista de mídias atualizada com sucesso!');
+      } else {
+        console.log('Nenhuma mídia encontrada na resposta');
+        setPlaylist([]);
+        setCurrentIndex(0);
+        setUpdateMessage('Nenhuma mídia encontrada');
+      }
+    } catch (err) {
+      console.error('Erro ao buscar mídias:', err);
+      setPlaylist([]);
+      setCurrentIndex(0);
+      setUpdateMessage('Erro ao atualizar mídias');
+    }
   };
 
-  const pausePlaylist = () => {
-    setIsPlaying(false);
-  };
+  // Efeito para buscar mídias periodicamente e observar mudanças no Firebase
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    let stopped = false;
 
-  const resumePlaylist = () => {
-    setIsPlaying(true);
-  };
+    // Configurar listener do Firebase
+    if (options?.mediaId) {
+      const updateRef = ref(database, `updates/${options.mediaId}`);
+      onValue(updateRef, (snapshot) => {
+        if (!stopped) {
+          const data = snapshot.val();
+          if (data) {
+            console.log('Atualização detectada no Firebase:', data);
+            getMedias();
+          }
+        }
+      });
+    }
 
+    // Request inicial
+    getMedias();
+
+    // Request a cada 1 hora
+    intervalId = setInterval(() => {
+      if (!stopped) getMedias();
+    }, 60 * 60 * 1000);
+
+    return () => {
+      stopped = true;
+      if (intervalId) clearInterval(intervalId);
+      if (options?.mediaId) {
+        const updateRef = ref(database, `updates/${options.mediaId}`);
+        off(updateRef);
+      }
+    };
+  }, [options?.mediaId, options?.token]);
+
+  // Timer para trocar de mídia
   useEffect(() => {
     if (!isPlaying || !currentMedia) return;
 
     const timer = setTimeout(() => {
-      nextMedia();
+      setCurrentIndex((prev) => (prev + 1) % playlist.length);
     }, currentMedia.duration);
 
     return () => clearTimeout(timer);
-  }, [currentIndex, isPlaying, currentMedia]);
+  }, [currentIndex, isPlaying, currentMedia, playlist.length]);
 
   return {
     playlist,
     currentMedia,
     currentIndex,
     isPlaying,
-    nextMedia,
-    pausePlaylist,
-    resumePlaylist,
+    updateMessage,
+    nextMedia: () => setCurrentIndex((prev) => (prev + 1) % playlist.length),
+    pausePlaylist: () => setIsPlaying(false),
+    resumePlaylist: () => setIsPlaying(true),
     setPlaylist
   };
 };
