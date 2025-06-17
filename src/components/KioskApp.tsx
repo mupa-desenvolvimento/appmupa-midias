@@ -17,7 +17,11 @@ const KioskApp = () => {
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('selectstart', e => e.preventDefault());
     
-    // Full screen mode
+    // Remove scrollbars and ensure full screen
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    // Try to enter fullscreen mode
     if (document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(console.log);
     }
@@ -39,7 +43,7 @@ const KioskApp = () => {
   }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-black">
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
       {/* Media Player */}
       <MediaPlayer isActive={mode === 'media'} />
 
@@ -56,15 +60,15 @@ const KioskApp = () => {
         onConfigSave={handleConfigSave}
       />
 
-      {/* Floating Action Buttons */}
+      {/* Floating Action Buttons - only show in media mode */}
       {mode === 'media' && (
-        <div className="fixed bottom-6 right-6 flex flex-col space-y-3">
+        <div className="fixed bottom-8 right-8 flex flex-col space-y-4 z-50">
           <Button
             onClick={switchToConsultation}
             size="lg"
-            className="bg-green-600 hover:bg-green-700 text-white shadow-lg px-6 py-4 text-lg rounded-full"
+            className="bg-green-600 hover:bg-green-700 text-white shadow-2xl px-8 py-6 text-xl rounded-2xl border-2 border-green-500"
           >
-            <Search className="w-6 h-6 mr-2" />
+            <Search className="w-8 h-8 mr-3" />
             Consultar Preço
           </Button>
           
@@ -72,17 +76,12 @@ const KioskApp = () => {
             onClick={switchToConfig}
             size="sm"
             variant="secondary"
-            className="bg-gray-600 hover:bg-gray-700 text-white shadow-lg rounded-full p-3"
+            className="bg-gray-600 hover:bg-gray-700 text-white shadow-xl rounded-full p-4"
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-5 h-5" />
           </Button>
         </div>
       )}
-
-      {/* Status Bar */}
-      <div className="fixed top-0 left-0 right-0 bg-black/50 text-white p-2 text-center text-sm z-50">
-        Terminal: {config.deviceId} | Modo: {mode.toUpperCase()} | Status: Online
-      </div>
     </div>
   );
 };

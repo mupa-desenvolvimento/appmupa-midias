@@ -8,7 +8,7 @@ const mockProducts: Record<string, Product> = {
     barcode: '7891000100103',
     name: 'Coca-Cola Lata 350ml',
     description: 'Refrigerante Coca-Cola Original Lata 350ml',
-    imageUrl: '/api/placeholder/300/300',
+    imageUrl: 'https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=400&h=400&fit=crop',
     normalPrice: 3.50,
     promotionalPrice: 2.99,
     isOnSale: true,
@@ -19,14 +19,27 @@ const mockProducts: Record<string, Product> = {
   '1234567890123': {
     id: '2',
     barcode: '1234567890123',
-    name: 'Pão de Açúcar Integral',
-    description: 'Pão integral com fibras, 500g',
-    imageUrl: '/api/placeholder/300/300',
+    name: 'Pão Integral 500g',
+    description: 'Pão integral com fibras, rico em nutrientes',
+    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop',
     normalPrice: 4.50,
     isOnSale: false,
     unit: 'un',
     expiryDate: '2024-06-20',
     additionalInfo: 'Rico em fibras'
+  },
+  '7891234567890': {
+    id: '3',
+    barcode: '7891234567890',
+    name: 'Leite Integral 1L',
+    description: 'Leite integral pasteurizado tipo A',
+    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=400&h=400&fit=crop',
+    normalPrice: 5.99,
+    promotionalPrice: 4.99,
+    isOnSale: true,
+    unit: 'un',
+    expiryDate: '2024-06-25',
+    additionalInfo: 'Fonte de cálcio'
   }
 };
 

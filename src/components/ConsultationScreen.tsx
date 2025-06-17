@@ -1,13 +1,12 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Product } from '../types';
 import { useBarcodeScan } from '../hooks/useBarcodeScan';
 import { useProductData } from '../hooks/useProductData';
 import ProductLayout1 from './ProductLayout1';
 import ProductLayout2 from './ProductLayout2';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Loader2, Camera, Package, AlertCircle } from 'lucide-react';
+import { Loader2, Package, AlertCircle } from 'lucide-react';
 
 interface ConsultationScreenProps {
   isActive: boolean;
@@ -16,9 +15,16 @@ interface ConsultationScreenProps {
 }
 
 const ConsultationScreen = ({ isActive, onTimeout, layout }: ConsultationScreenProps) => {
-  const { isScanning, scannedCode, startScan, resetScan } = useBarcodeScan();
+  const { isScanning, scannedCode, resetScan, handleBarcodeScan } = useBarcodeScan();
   const { loading, error, getProduct } = useProductData();
   const [product, setProduct] = useState<Product | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isActive && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isActive]);
 
   useEffect(() => {
     if (scannedCode) {
@@ -34,7 +40,28 @@ const ConsultationScreen = ({ isActive, onTimeout, layout }: ConsultationScreenP
   const handleNewScan = () => {
     resetScan();
     setProduct(null);
-    startScan();
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.value = '';
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value.length >= 8) { // Códigos de barras geralmente têm 8+ dígitos
+      handleBarcodeScan(value);
+      e.target.value = '';
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const value = (e.target as HTMLInputElement).value;
+      if (value.length >= 8) {
+        handleBarcodeScan(value);
+        (e.target as HTMLInputElement).value = '';
+      }
+    }
   };
 
   const renderProductLayout = (product: Product) => {
@@ -49,69 +76,68 @@ const ConsultationScreen = ({ isActive, onTimeout, layout }: ConsultationScreenP
   if (!isActive) return null;
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+      {/* Input invisível para captura de código de barras */}
+      <input
+        ref={inputRef}
+        type="text"
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        className="absolute -left-full opacity-0 pointer-events-none"
+        autoFocus
+        tabIndex={0}
+      />
+
       {product ? (
-        <div className="w-full max-w-6xl space-y-6">
-          {renderProductLayout(product)}
+        <div className="w-full h-full flex flex-col">
+          <div className="flex-1 flex items-center justify-center">
+            {renderProductLayout(product)}
+          </div>
           
-          <div className="text-center">
+          <div className="p-8 text-center">
             <Button 
               onClick={handleNewScan}
               size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-4 text-xl rounded-xl"
             >
-              <Camera className="w-5 h-5 mr-2" />
+              <Package className="w-6 h-6 mr-3" />
               Consultar Outro Produto
             </Button>
           </div>
         </div>
       ) : (
-        <Card className="w-full max-w-md bg-white shadow-xl p-8 text-center space-y-6">
-          <div className="space-y-4">
-            <Package className="w-16 h-16 mx-auto text-blue-600" />
-            <h2 className="text-2xl font-bold text-gray-900">
+        <div className="text-center space-y-8">
+          <div className="space-y-6">
+            <Package className="w-24 h-24 mx-auto text-blue-600" />
+            <h2 className="text-4xl font-bold text-blue-900">
               Consulta de Preços
             </h2>
-            <p className="text-gray-600">
-              Escaneie o código de barras do produto para ver o preço
+            <p className="text-xl text-blue-700">
+              Escaneie o código de barras do produto
             </p>
           </div>
 
           {loading && (
-            <div className="flex items-center justify-center space-x-2 text-blue-600">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Buscando produto...</span>
+            <div className="flex items-center justify-center space-x-3 text-blue-600">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <span className="text-xl">Buscando produto...</span>
             </div>
           )}
 
           {error && (
-            <div className="flex items-center justify-center space-x-2 text-red-600 bg-red-50 p-3 rounded-lg">
-              <AlertCircle className="w-5 h-5" />
-              <span>{error}</span>
+            <div className="flex items-center justify-center space-x-3 text-red-600 bg-red-50 p-4 rounded-xl max-w-md mx-auto">
+              <AlertCircle className="w-6 h-6" />
+              <span className="text-lg">{error}</span>
             </div>
           )}
 
-          {isScanning && (
-            <div className="flex items-center justify-center space-x-2 text-green-600">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Escaneando...</span>
+          {isScanning && !loading && (
+            <div className="flex items-center justify-center space-x-3 text-green-600">
+              <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-xl">Aguardando código de barras...</span>
             </div>
           )}
-
-          <Button 
-            onClick={startScan}
-            disabled={isScanning || loading}
-            size="lg"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3"
-          >
-            <Camera className="w-5 h-5 mr-2" />
-            {isScanning ? 'Escaneando...' : 'Escanear Código de Barras'}
-          </Button>
-
-          <p className="text-xs text-gray-500">
-            Retorna automaticamente à tela inicial em 30 segundos
-          </p>
-        </Card>
+        </div>
       )}
     </div>
   );
