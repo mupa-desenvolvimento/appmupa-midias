@@ -1,5 +1,5 @@
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppMode } from '../hooks/useAppMode';
 import { AppConfig } from '../types';
 import MediaPlayer from './MediaPlayer';
