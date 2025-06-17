@@ -1,16 +1,16 @@
-
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAppMode } from '../hooks/useAppMode';
 import { AppConfig } from '../types';
 import MediaPlayer from './MediaPlayer';
 import ConsultationScreen from './ConsultationScreen';
 import ConfigScreen from './ConfigScreen';
+import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Settings, Search } from 'lucide-react';
 
 const KioskApp = () => {
-  const { mode, switchToConsultation, switchToMedia, switchToConfig, resetTimeout } = useAppMode();
+  const { mode, switchToConsultation, switchToMedia, switchToConfig } = useAppMode();
   const [config, setConfig] = useState<AppConfig | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Prevent context menu and selection
@@ -32,9 +32,34 @@ const KioskApp = () => {
     };
   }, []);
 
+  useEffect(() => {
+    // Always keep focus on input for barcode scanning
+    if (mode === 'media' && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [mode]);
+
   const handleConfigSave = (newConfig: AppConfig) => {
     setConfig(newConfig);
     switchToMedia();
+  };
+
+  const handleBarcodeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value.length >= 8) {
+      switchToConsultation();
+      e.target.value = '';
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const value = (e.target as HTMLInputElement).value;
+      if (value.length >= 8) {
+        switchToConsultation();
+        (e.target as HTMLInputElement).value = '';
+      }
+    }
   };
 
   // Show config screen if not configured
@@ -44,6 +69,17 @@ const KioskApp = () => {
 
   return (
     <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
+      {/* Input invisível para leitura de código de barras */}
+      <input
+        ref={inputRef}
+        type="text"
+        onChange={handleBarcodeInput}
+        onKeyDown={handleKeyDown}
+        className="absolute -left-full opacity-0 pointer-events-none"
+        autoFocus
+        tabIndex={0}
+      />
+
       {/* Media Player */}
       <MediaPlayer isActive={mode === 'media'} />
 
@@ -60,25 +96,16 @@ const KioskApp = () => {
         onConfigSave={handleConfigSave}
       />
 
-      {/* Floating Action Buttons - only show in media mode */}
+      {/* Botão de configuração - apenas no modo mídia */}
       {mode === 'media' && (
-        <div className="fixed bottom-8 right-8 flex flex-col space-y-4 z-50">
-          <Button
-            onClick={switchToConsultation}
-            size="lg"
-            className="bg-green-600 hover:bg-green-700 text-white shadow-2xl px-8 py-6 text-xl rounded-2xl border-2 border-green-500"
-          >
-            <Search className="w-8 h-8 mr-3" />
-            Consultar Preço
-          </Button>
-          
+        <div className="fixed top-4 right-4 z-50">
           <Button
             onClick={switchToConfig}
             size="sm"
             variant="secondary"
-            className="bg-gray-600 hover:bg-gray-700 text-white shadow-xl rounded-full p-4"
+            className="bg-black/20 hover:bg-black/40 text-white shadow-xl rounded-full p-3 opacity-20 hover:opacity-100 transition-opacity"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-4 h-4" />
           </Button>
         </div>
       )}

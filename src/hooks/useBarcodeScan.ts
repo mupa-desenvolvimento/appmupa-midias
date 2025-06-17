@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export const useBarcodeScan = () => {
   const [isScanning, setIsScanning] = useState(true);
@@ -16,9 +16,11 @@ export const useBarcodeScan = () => {
   };
 
   const handleBarcodeScan = (barcode: string) => {
-    if (barcode && barcode.length >= 8) { // Validação mínima para códigos de barras
+    if (barcode && barcode.length >= 8) {
       setScannedCode(barcode);
       setIsScanning(false);
+      // Store barcode for consultation screen
+      localStorage.setItem('lastBarcode', barcode);
     }
   };
 

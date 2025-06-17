@@ -40,6 +40,30 @@ const mockProducts: Record<string, Product> = {
     unit: 'un',
     expiryDate: '2024-06-25',
     additionalInfo: 'Fonte de cálcio'
+  },
+  // Código fictício para teste
+  '12345678': {
+    id: '4',
+    barcode: '12345678',
+    name: 'Produto Teste',
+    description: 'Produto para teste do terminal',
+    imageUrl: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop',
+    normalPrice: 10.00,
+    promotionalPrice: 7.99,
+    isOnSale: true,
+    unit: 'un',
+    additionalInfo: 'Produto fictício para demonstração'
+  },
+  '87654321': {
+    id: '5',
+    barcode: '87654321',
+    name: 'Outro Produto Teste',
+    description: 'Segundo produto para teste',
+    imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&h=400&fit=crop',
+    normalPrice: 15.50,
+    isOnSale: false,
+    unit: 'un',
+    additionalInfo: 'Segundo produto fictício'
   }
 };
 
