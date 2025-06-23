@@ -1,144 +1,60 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { MediaItem } from '../types';
-import { fetchMedias } from '../lib/api/medias';
+// import { fetchMedias } from '../lib/api/medias'; // REMOVIDO - Não busca mais dados
 import { database } from '../lib/firebase';
 import { ref, onValue, off } from 'firebase/database';
 
-const mockPlaylist: MediaItem[] = [
-  {
-    id: '1',
-    type: 'image',
-    url: 'https://images.unsplash.com/photo-1506617564039-2f3b650b7010?w=1920&h=1080&fit=crop',
-    duration: 5000,
-    title: 'Padaria - Pães Frescos',
-    order: 1
-  },
-  {
-    id: '2',
-    type: 'image',
-    url: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=1920&h=1080&fit=crop',
-    duration: 4000,
-    title: 'Produtos Alimentícios',
-    order: 2
-  },
-  {
-    id: '3',
-    type: 'image',
-    url: 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=1920&h=1080&fit=crop',
-    duration: 6000,
-    title: 'Açougue - Carnes Frescas',
-    order: 3
-  },
-  {
-    id: '4',
-    type: 'image',
-    url: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=1920&h=1080&fit=crop',
-    duration: 5000,
-    title: 'Hortifruti - Frutas Frescas',
-    order: 4
-  },
-  {
-    id: '5',
-    type: 'image',
-    url: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1920&h=1080&fit=crop',
-    duration: 4000,
-    title: 'Variedade de Produtos',
-    order: 5
-  }
-];
-
-export const useMediaPlaylist = (options?: { mediaId?: string, token?: string }) => {
-  const [playlist, setPlaylist] = useState<MediaItem[]>([]);
+export const useMediaPlaylist = (initialPlaylist: MediaItem[] = [], options?: { groupId?: string }) => {
+  const [playlist, setPlaylist] = useState<MediaItem[]>(initialPlaylist);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [updateMessage, setUpdateMessage] = useState<string>('');
+  const [useNaturalDuration, setUseNaturalDuration] = useState(false);
 
-  const currentMedia = playlist[currentIndex];
+  // Efeito para atualizar a playlist interna se a inicial mudar
+  useEffect(() => {
+    // Transforma a playlist da config para o formato que o player espera
+    const formattedPlaylist = initialPlaylist.map((item: any) => {
+      // Lógica para encontrar a URL correta e normalizá-la
+      let mediaUrl = item.url_download || item.link || item.final || item.url || '';
+      if (mediaUrl && mediaUrl.startsWith('//')) {
+        mediaUrl = 'https:' + mediaUrl;
+      }
 
-  // Função para buscar mídias
-  const getMedias = async () => {
-    if (!options?.mediaId || !options?.token) return;
-
-    const now = new Date();
-    const hour = now.getHours();
-    if (hour < 6 || hour > 22) {
-      console.log('Fora do horário de atualização de mídias (6h-22h)');
-      return;
-    }
-
-    try {
-      setUpdateMessage('Atualizando lista de mídias...');
-      const data = await fetchMedias({ _id: options.mediaId, token: options.token });
-      console.log('Resposta da API de mídias:', data);
+      // Se for vídeo, não definimos duration pois usaremos a duração natural do vídeo
+      const isVideo = item.type === 'video' || mediaUrl?.includes('.mp4');
       
-      if (data?.response?.medias && Array.isArray(data.response.medias) && data.response.medias.length > 0) {
-        const items: MediaItem[] = data.response.medias.map((item: any) => ({
-          id: item._id || item.id || String(Math.random()),
-          type: item.type || 'image',
-          url: item.link || item.final || item.url,
-          duration: (item.time || 8) * 1000,
-          title: item.nome || '',
-          order: item.order || 1
-        }));
+      return {
+        id: item._id || item.id || String(Math.random()),
+        type: isVideo ? 'video' : 'image',
+        url: mediaUrl,
+        duration: isVideo ? undefined : (item.duration || item.time || 8) * 1000,
+        title: item.Nome || item.nome || '',
+        order: item.order || 1
+      };
+    });
+    setPlaylist(formattedPlaylist);
+    setCurrentIndex(0); // Reinicia ao receber nova lista
+  }, [initialPlaylist]);
 
-        console.log('Items processados:', items);
-        setPlaylist(items);
-        setCurrentIndex(0);
-        setUpdateMessage('Lista de mídias atualizada com sucesso!');
-      } else {
-        console.log('Nenhuma mídia encontrada na resposta');
-        setPlaylist([]);
-        setCurrentIndex(0);
-        setUpdateMessage('Nenhuma mídia encontrada');
-      }
-    } catch (err) {
-      console.error('Erro ao buscar mídias:', err);
-      setPlaylist([]);
-      setCurrentIndex(0);
-      setUpdateMessage('Erro ao atualizar mídias');
-    }
-  };
+  const currentMedia = useMemo(() => playlist[currentIndex], [playlist, currentIndex]);
 
-  // Efeito para buscar mídias periodicamente e observar mudanças no Firebase
+  // Efeito para observar mudanças no Firebase
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-    let stopped = false;
-
-    // Configurar listener do Firebase
-    if (options?.mediaId) {
-      const updateRef = ref(database, `updates/${options.mediaId}`);
-      onValue(updateRef, (snapshot) => {
-        if (!stopped) {
-          const data = snapshot.val();
-          if (data) {
-            console.log('Atualização detectada no Firebase:', data);
-            getMedias();
-          }
-        }
-      });
+    // A lógica de atualização via Firebase pode ser reimplementada aqui depois.
+    // Por agora, vamos focar em fazer o player funcionar com a lista inicial.
+    // Se precisar de atualização em tempo real, podemos reativar isso.
+    if (options?.groupId) {
+       console.log(`Ouvindo atualizações para o grupo: ${options.groupId}`);
+       // const updateRef = ref(database, `updates/${options.groupId}`);
+       // onValue(updateRef, ...);
+       // return () => off(updateRef);
     }
+  }, [options?.groupId]);
 
-    // Request inicial
-    getMedias();
-
-    // Request a cada 1 hora
-    intervalId = setInterval(() => {
-      if (!stopped) getMedias();
-    }, 60 * 60 * 1000);
-
-    return () => {
-      stopped = true;
-      if (intervalId) clearInterval(intervalId);
-      if (options?.mediaId) {
-        const updateRef = ref(database, `updates/${options.mediaId}`);
-        off(updateRef);
-      }
-    };
-  }, [options?.mediaId, options?.token]);
-
-  // Timer para trocar de mídia
+  // Timer para trocar de mídia (apenas para imagens)
   useEffect(() => {
-    if (!isPlaying || !currentMedia) return;
+    // Se for vídeo ou não tiver duração definida, não usa o timer
+    if (!isPlaying || !currentMedia?.duration || playlist.length === 0 || currentMedia.type === 'video') return;
 
     const timer = setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % playlist.length);
@@ -152,10 +68,9 @@ export const useMediaPlaylist = (options?: { mediaId?: string, token?: string })
     currentMedia,
     currentIndex,
     isPlaying,
-    updateMessage,
     nextMedia: () => setCurrentIndex((prev) => (prev + 1) % playlist.length),
-    pausePlaylist: () => setIsPlaying(false),
-    resumePlaylist: () => setIsPlaying(true),
-    setPlaylist
+    prevMedia: () => setCurrentIndex((prev) => (prev - 1 + playlist.length) % playlist.length),
+    pause: () => setIsPlaying(false),
+    play: () => setIsPlaying(true),
   };
 };

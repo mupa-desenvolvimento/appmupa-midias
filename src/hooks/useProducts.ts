@@ -1,20 +1,26 @@
 import { useState } from 'react';
-import { Product, ProductService } from '../lib/api/products';
+import { Product, ProductService, AudioResponse } from '../lib/api/products';
 
 export function useProducts() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [audio, setAudio] = useState<AudioResponse | null>(null);
 
-  const searchProducts = async (query: string) => {
+  const searchProductByBarcode = async (barcode: string) => {
     try {
       setLoading(true);
       setError(null);
-      const results = await ProductService.searchProducts(query);
-      setProducts(results);
+      const productData = await ProductService.getProductByBarcode(barcode);
+      setProduct(productData);
+      
+      // Buscar áudio do produto
+      const audioData = await ProductService.getProductAudio(barcode);
+      setAudio(audioData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao buscar produtos');
-      setProducts([]);
+      setError(err instanceof Error ? err.message : 'Erro ao buscar produto');
+      setProduct(null);
+      setAudio(null);
     } finally {
       setLoading(false);
     }
@@ -35,10 +41,11 @@ export function useProducts() {
   };
 
   return {
-    products,
+    product,
+    audio,
     loading,
     error,
-    searchProducts,
+    searchProductByBarcode,
     getProductById,
   };
 } 

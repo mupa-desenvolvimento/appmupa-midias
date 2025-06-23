@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mupa Digital Terminal</string>
+    <string name="title_activity_main">Mupa Digital Terminal</string>
+    <string name="package_name">app.mupa.terminal</string>
+    <string name="custom_url_scheme">app.mupa.terminal</string>
+</resources>

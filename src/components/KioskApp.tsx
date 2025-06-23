@@ -1,143 +1,137 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppMode } from '../hooks/useAppMode';
-import { AppConfig } from '../types';
+import { useAudio } from '../contexts/AudioContext';
+import { AppConfig, MediaItem } from '../types';
 import MediaPlayer from './MediaPlayer';
 import ConsultationScreen from './ConsultationScreen';
 import ConfigScreen from './ConfigScreen';
-import { Settings } from 'lucide-react';
+import { Settings, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ConfigManager, SystemConfig } from '@/lib/config';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { database } from '@/lib/firebase';
+import { ref, onValue, off } from 'firebase/database';
+import { MediaService } from '@/lib/api/medias';
+import { mediaCacheService } from '@/lib/services/MediaCacheService';
+import { useIdleTimer } from '@/hooks/useIdleTimer';
 
 const KioskApp = () => {
   const { mode, switchToConsultation, switchToMedia, switchToConfig } = useAppMode();
-  const [config, setConfig] = useState<AppConfig | null>(null);
+  const { stopCurrentAudio } = useAudio();
+  const [config, setConfig] = useState<SystemConfig>(ConfigManager.getConfig());
   const [scannedBarcode, setScannedBarcode] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isConfigScreen, setIsConfigScreen] = useState(false);
-  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState('');
+  const [isConfigAuthOpen, setIsConfigAuthOpen] = useState(false);
+  const [configAuthCode, setConfigAuthCode] = useState('');
+  const [configAuthError, setConfigAuthError] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  
+  const debouncedStopAudio = useCallback(() => {
+    setTimeout(() => stopCurrentAudio(), 300);
+  }, [stopCurrentAudio]);
+  
+  useIdleTimer(switchToMedia, 60000, mode === 'config');
 
-  // Foca o input após interação do usuário
-  useEffect(() => {
-    if (!isConfigScreen && hasUserInteracted && inputRef.current) {
-      inputRef.current.focus();
+  const hideKeyboard = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
     }
-  }, [isConfigScreen, hasUserInteracted]);
-
-  // Marca que o usuário interagiu (primeiro clique/tap)
-  useEffect(() => {
-    const handleUserInteraction = () => {
-      setHasUserInteracted(true);
-    };
-    document.addEventListener('click', handleUserInteraction, { once: true });
-    document.addEventListener('touchstart', handleUserInteraction, { once: true });
-    return () => {
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-    };
-  }, []);
+  };
 
   useEffect(() => {
-    if (mode === 'config') {
-      setIsConfigScreen(true);
+    if (mode === 'media') {
+      if (!isConfigAuthOpen) {
+        hideKeyboard();
+        inputRef.current?.focus();
+      }
     } else {
-      setIsConfigScreen(false);
+      hideKeyboard();
     }
-  }, [mode]);
+  }, [mode, isConfigAuthOpen]);
 
-  const handleConfigSave = (newConfig: AppConfig) => {
+  const handleConfigSave = (newConfig: SystemConfig) => {
+    ConfigManager.saveConfig(newConfig);
     setConfig(newConfig);
-    console.log('Config salva:', newConfig); // Debug
     switchToMedia();
+  };
+  
+  const handleConfigAuth = () => {
+    if (configAuthCode === 'mupa.2024') {
+      setIsConfigAuthOpen(false);
+      switchToConfig();
+    } else {
+      setConfigAuthError('Código incorreto. Tente novamente.');
+    }
   };
 
   const handleBarcodeInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     setBarcodeValue(e.target.value);
   };
-
+  
   const handleBarcodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       const value = (e.target as HTMLInputElement).value;
+      if (value === '9999') {
+        setConfigAuthCode('');
+        setConfigAuthError(null);
+        setIsConfigAuthOpen(true);
+        setBarcodeValue('');
+        return;
+      }
       if (value.length >= 4) {
+        debouncedStopAudio();
         setScannedBarcode(value);
         switchToConsultation();
-        setBarcodeValue(''); // Limpa o input
+        setBarcodeValue('');
       }
     }
   };
-
-  // Foco automático sempre que não estiver na tela de configuração
-  useEffect(() => {
-    if (!isConfigScreen && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isConfigScreen, mode]);
-
-  // Show config screen if not configured
-  if (!config) {
-    return <ConfigScreen isActive={true} onConfigSave={handleConfigSave} />;
+  
+  if (!config.selectedGroupId) {
+    return <ConfigScreen isActive={true} onConfigSave={handleConfigSave} onCancel={switchToMedia} />;
   }
 
-  console.log('Layout ativo:', config.activeLayout); // Debug
-
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
-      {/* Input invisível para leitura de código de barras */}
-      <input
-        ref={inputRef}
-        id="input_barcode"
-        type="text"
-        value={barcodeValue}
-        onChange={handleBarcodeInput}
-        onKeyDown={handleBarcodeKeyDown}
-        autoFocus
-        tabIndex={0}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          width: '1px',
-          height: '1px',
-          opacity: 0,
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-        aria-hidden="true"
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black transition-all duration-300 ease-in-out">
+      <input 
+        ref={inputRef} 
+        type="text" 
+        value={barcodeValue} 
+        onChange={handleBarcodeInput} 
+        onKeyDown={handleBarcodeKeyDown} 
+        autoFocus 
+        className="opacity-0 w-1 h-1 absolute top-0 left-0"
+        inputMode="none" 
       />
-
-      {/* Media Player */}
-      <MediaPlayer 
-        isActive={mode === 'media'}
-        mediaId="1700411533483x832110738923847700"
-        token="9c264e50ddb95a215b446412a3b42b58"
-      />
-
-      {/* Consultation Screen */}
-      <ConsultationScreen 
-        isActive={mode === 'consultation'} 
-        onTimeout={switchToMedia}
-        layout={config.activeLayout}
-        barcode={scannedBarcode}
-      />
-
-      {/* Config Screen */}
-      <ConfigScreen 
-        isActive={mode === 'config'} 
-        onConfigSave={handleConfigSave}
-      />
-
-      {/* Botão de configuração - apenas no modo mídia */}
-      {mode === 'media' && (
-        <div className="fixed top-4 right-4 z-50">
-          <Button
-            onClick={switchToConfig}
-            size="sm"
-            variant="secondary"
-            className="bg-black/20 hover:bg-black/40 text-white shadow-xl rounded-full p-3 opacity-20 hover:opacity-100 transition-opacity"
-          >
-            <Settings className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
+      <MediaPlayer isActive={mode === 'media'} playlist={config.mediaPlaylist || []} groupId={config.selectedGroupId} />
+      <ConsultationScreen isActive={mode === 'consultation'} onTimeout={switchToMedia} barcode={scannedBarcode} layout={config.activeLayout} />
+      <ConfigScreen isActive={mode === 'config'} onConfigSave={handleConfigSave} onCancel={switchToMedia} />
+      <Dialog open={isConfigAuthOpen} onOpenChange={setIsConfigAuthOpen}>
+        <DialogContent className="sm:max-w-[425px] bg-[#0A0A0A] border-[#27272A] text-white">
+          <DialogHeader><DialogTitle className="text-white">Acesso Restrito</DialogTitle><DialogDescription className="text-gray-400">Para acessar as configurações, por favor, insira o código do usuário.</DialogDescription></DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="config-code" className="text-right text-gray-300">Código</Label>
+              <Input id="config-code" type="password" value={configAuthCode} onChange={(e) => setConfigAuthCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleConfigAuth()} className="col-span-3 bg-[#18181B] border-[#27272A] text-white" autoFocus />
+            </div>
+            {configAuthError && (<p className="text-red-500 text-sm col-span-4 text-center">{configAuthError}</p>)}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setIsConfigAuthOpen(false)} className="bg-transparent border-[#27272A] text-gray-300 hover:bg-[#27272A] hover:text-white">Cancelar</Button>
+            <Button type="submit" onClick={handleConfigAuth} className="bg-white text-black hover:bg-gray-200">Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

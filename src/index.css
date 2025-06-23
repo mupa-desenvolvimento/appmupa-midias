@@ -99,5 +99,45 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Poppins-Light', Poppins, sans-serif;
+  }
+}
+
+@font-face {
+  font-family: 'Poppins-Medium';
+  src: url('/fonts/Poppins-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Poppins-Light';
+  src: url('/fonts/Poppins-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'BebasNeue-Regular';
+  src: url('/fonts/BebasNeue-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Regra para números */
+.number {
+  font-family: 'BebasNeue-Regular', Bebas Neue, sans-serif;
+}
+
+/* Animação de brilho para efeitos visuais */
+@keyframes shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
   }
 }

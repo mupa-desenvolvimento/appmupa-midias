@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { useProductData } from '../hooks/useProductData';
+import { useAudio } from '../contexts/AudioContext';
 import { Button } from '@/components/ui/button';
 import { Loader2, Package, AlertCircle } from 'lucide-react';
 import { extractBrand } from '../lib/utils';
@@ -16,6 +17,7 @@ interface ConsultationScreenProps {
 
 const ConsultationScreen = ({ isActive, onTimeout, barcode, layout }: ConsultationScreenProps) => {
   const { loading, error, getProduct } = useProductData();
+  const { waitForAudioEnd, isAudioPlaying, isSpeechPlaying } = useAudio();
   const [product, setProduct] = useState<Product | null>(null);
   const [brand, setBrand] = useState<string | null>(null);
 
@@ -27,13 +29,22 @@ const ConsultationScreen = ({ isActive, onTimeout, barcode, layout }: Consultati
 
   useEffect(() => {
     if (isActive && !loading && (product || error)) {
-      const timer = setTimeout(() => {
+      const timer = setTimeout(async () => {
+        console.log('⏰ Timeout de 10s atingido, verificando áudio...');
+        
+        // Aguardar o fim do áudio antes de voltar para a tela de conteúdo
+        if (isAudioPlaying || isSpeechPlaying) {
+          console.log('🎵 Áudio ainda tocando, aguardando finalizar...');
+          await waitForAudioEnd();
+          console.log('✅ Áudio finalizado, voltando para tela de conteúdo');
+        }
+        
         onTimeout();
         setProduct(null);
       }, 10000);
       return () => clearTimeout(timer);
     }
-  }, [isActive, loading, product, error, onTimeout]);
+  }, [isActive, loading, product, error, onTimeout, isAudioPlaying, isSpeechPlaying, waitForAudioEnd]);
 
   const handleProductLookup = async (code: string) => {
     const productData = await getProduct(code);
@@ -43,7 +54,16 @@ const ConsultationScreen = ({ isActive, onTimeout, barcode, layout }: Consultati
     }
   };
 
-  const handleNewScan = () => {
+  const handleNewScan = async () => {
+    console.log('🔄 Botão "Voltar" pressionado, verificando áudio...');
+    
+    // Aguardar o fim do áudio antes de voltar
+    if (isAudioPlaying || isSpeechPlaying) {
+      console.log('🎵 Áudio ainda tocando, aguardando finalizar...');
+      await waitForAudioEnd();
+      console.log('✅ Áudio finalizado, voltando para tela de conteúdo');
+    }
+    
     setProduct(null);
     setBrand(null);
     onTimeout();

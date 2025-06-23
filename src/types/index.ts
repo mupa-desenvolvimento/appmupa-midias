@@ -1,4 +1,3 @@
-
 export interface Product {
   id: string;
   barcode: string;
@@ -11,13 +10,28 @@ export interface Product {
   unit: string;
   expiryDate?: string;
   additionalInfo?: string;
+  salePrice?: number | null;
+  audioUrl?: string;
+  displayInfo?: {
+    backgroundColor: string;
+    style: string;
+    highlightText: string;
+    primaryText: string;
+    secondaryText: string;
+    tipo_preco?: string;
+    tipo_oferta?: string;
+    dominante?: string;
+    secundaria?: string;
+    terciaria?: string;
+    quaternaria?: string;
+  };
 }
 
 export interface MediaItem {
   id: string;
-  type: 'image' | 'video' | 'interactive';
+  type: 'image' | 'video';
   url: string;
-  duration: number;
+  duration?: number;
   title?: string;
   order: number;
 }

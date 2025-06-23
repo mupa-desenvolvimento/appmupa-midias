@@ -1,0 +1,147 @@
+{
+	"info": {
+		"_postman_id": "65a3fa21-7d5f-4d61-a602-c3d85b4eb09c",
+		"name": "Mupa_bubble",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "4711826",
+		"_collection_link": "https://antunes101183.postman.co/workspace/Mupa-Empresa~06bae538-c166-46fe-9d53-f95d41db7dee/collection/4711826-65a3fa21-7d5f-4d61-a602-c3d85b4eb09c?action=share&source=collection_link&creator=4711826"
+	},
+	"item": [
+		{
+			"name": "get_grupo_by_empresa",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token 9c264e50ddb95a215b446412a3b42b58",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://mupa.app/api/1.1/wf/get_grupos?empresa_id=1700359013183x959815499017093100",
+					"protocol": "https",
+					"host": [
+						"mupa",
+						"app"
+					],
+					"path": [
+						"api",
+						"1.1",
+						"wf",
+						"get_grupos"
+					],
+					"query": [
+						{
+							"key": "empresa_id",
+							"value": "1700359013183x959815499017093100"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get_cod_user",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token 9c264e50ddb95a215b446412a3b42b58",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://mupa.app/api/1.1/wf/post-cod-user?cod-user=mu04pa05",
+					"protocol": "https",
+					"host": [
+						"mupa",
+						"app"
+					],
+					"path": [
+						"api",
+						"1.1",
+						"wf",
+						"post-cod-user"
+					],
+					"query": [
+						{
+							"key": "cod-user",
+							"value": "mu04pa05"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get_info_user_by_id",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token 9c264e50ddb95a215b446412a3b42b58",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://mupa.app/api/1.1/wf/get_user?user_id=1700359014358x531205371637140100",
+					"protocol": "https",
+					"host": [
+						"mupa",
+						"app"
+					],
+					"path": [
+						"api",
+						"1.1",
+						"wf",
+						"get_user"
+					],
+					"query": [
+						{
+							"key": "user_id",
+							"value": "1700359014358x531205371637140100"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "get_medias_by_grupo",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token 9c264e50ddb95a215b446412a3b42b58",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "https://mupa.app/api/1.1/wf/get_medias_?_id=1704455095433x651644463680847900",
+					"protocol": "https",
+					"host": [
+						"mupa",
+						"app"
+					],
+					"path": [
+						"api",
+						"1.1",
+						"wf",
+						"get_medias_"
+					],
+					"query": [
+						{
+							"key": "_id",
+							"value": "1704455095433x651644463680847900"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

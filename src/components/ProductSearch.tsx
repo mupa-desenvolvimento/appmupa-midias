@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { useProducts } from '../hooks/useProducts';
+import { useProductData } from '../hooks/useProductData';
+import ProductLayout1 from './ProductLayout1';
 
 export function ProductSearch() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { products, loading, error, searchProducts } = useProducts();
+  const { loading, error, getProduct } = useProductData();
+  const [product, setProduct] = useState<any>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (searchTerm.trim()) {
-      await searchProducts(searchTerm);
+      const result = await getProduct(searchTerm);
+      setProduct(result);
     }
   };
 
@@ -20,7 +23,7 @@ export function ProductSearch() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Digite o nome do produto..."
+            placeholder="Digite o código de barras do produto..."
             className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
@@ -39,31 +42,15 @@ export function ProductSearch() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {products.map((product) => (
-          <div
-            key={product.id}
-            className="p-4 border rounded-lg shadow-sm hover:shadow-md transition-shadow"
-          >
-            {product.imageUrl && (
-              <img
-                src={product.imageUrl}
-                alt={product.name}
-                className="w-full h-48 object-cover rounded-lg mb-4"
-              />
-            )}
-            <h3 className="text-lg font-semibold mb-2">{product.name}</h3>
-            <p className="text-gray-600 mb-2">{product.description}</p>
-            <p className="text-xl font-bold text-blue-600">
-              R$ {product.price.toFixed(2)}
-            </p>
-          </div>
-        ))}
-      </div>
+      {product && (
+        <div className="w-full h-[80vh]">
+          <ProductLayout1 product={product} />
+        </div>
+      )}
 
-      {products.length === 0 && !loading && !error && (
+      {!product && !loading && !error && (
         <p className="text-center text-gray-500">
-          Nenhum produto encontrado. Tente fazer uma busca.
+          Digite um código de barras para buscar o produto.
         </p>
       )}
     </div>

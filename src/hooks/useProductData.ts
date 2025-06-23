@@ -1,106 +1,16 @@
-
 import { useState } from 'react';
 import { Product } from '../types';
+import { ProductService } from '../lib/api/products';
 
-const TOKEN_KEY = 'zaffari_token';
-const TOKEN_TIMESTAMP_KEY = 'zaffari_token_timestamp';
-const TOKEN_EXPIRY_SECONDS = 3600;
-
-interface ZaffariProduct {
-  codigo_etiqueta: string;
-  codigo_produto: string;
-  descricao_produto: string;
-  ean: string;
-  embalagem_proporcional: string;
-  embalagem_venda: string;
-  link_imagem: string;
-  loja: string;
-  media_venda: string;
-  preco_base: string;
-  preco_prop_sellprice: string;
-  status_venda: string;
-}
-
-interface ZaffariResponse {
-  success: boolean;
-  data: ZaffariProduct;
+interface AudioResponse {
+  audio_hash: string;
+  audio_url: string;
+  texto: string;
 }
 
 export const useProductData = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Função para obter token do localStorage
-  const getStoredToken = (): string | null => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    const timestamp = localStorage.getItem(TOKEN_TIMESTAMP_KEY);
-    if (token && timestamp) {
-      const now = Math.floor(Date.now() / 1000);
-      const lastUpdate = parseInt(timestamp, 10);
-      if (now - lastUpdate < TOKEN_EXPIRY_SECONDS) {
-        console.log('Token válido encontrado no localStorage');
-        return token;
-      } else {
-        console.log('Token expirado, removendo do localStorage');
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(TOKEN_TIMESTAMP_KEY);
-      }
-    }
-    return null;
-  };
-
-  // Função para salvar token e timestamp
-  const saveToken = (token: string) => {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(TOKEN_TIMESTAMP_KEY, Math.floor(Date.now() / 1000).toString());
-    console.log('Token salvo no localStorage');
-  };
-
-  // Autenticação
-  const authenticate = async (): Promise<string | null> => {
-    try {
-      console.log('Iniciando autenticação...');
-      setError(null);
-      
-      const response = await fetch('https://zaffariexpress.com.br/api/login/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          usuario: 'mupa',
-          password: '7hDD$%k*WJrY%4sQQY9G',
-        }),
-      });
-
-      console.log('Status da autenticação:', response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Erro na resposta da autenticação:', errorText);
-        setError(`Falha na autenticação: ${response.status}`);
-        return null;
-      }
-
-      const data = await response.json();
-      console.log('Resposta da autenticação:', data);
-      
-      const token = data.token || data.access_token;
-      if (token) {
-        saveToken(token);
-        console.log('Token obtido com sucesso');
-        return token;
-      } else {
-        console.error('Token não encontrado na resposta:', data);
-        setError('Token não encontrado na resposta');
-        return null;
-      }
-    } catch (err) {
-      console.error('Erro na autenticação:', err);
-      setError('Erro de conexão na autenticação');
-      return null;
-    }
-  };
 
   // Consulta de produto
   const getProduct = async (barcode: string): Promise<Product | null> => {
@@ -110,71 +20,112 @@ export const useProductData = () => {
     try {
       console.log('Iniciando consulta do produto:', barcode);
       
-      let token = getStoredToken();
-      if (!token) {
-        console.log('Token não encontrado, fazendo autenticação...');
-        token = await authenticate();
-        if (!token) {
-          setError('Erro na autenticação');
-          setLoading(false);
-          return null;
-        }
-      }
+      // Usar o novo ProductService que já usa o endpoint fixo
+      const productData = await ProductService.getProductByBarcode(barcode);
+      console.log('Produto obtido do novo endpoint:', productData);
 
-      console.log('Fazendo consulta com token:', token.substring(0, 20) + '...');
-      
-      const response = await fetch(
-        `https://zaffariexpress.com.br/api/v1/consultapreco/precos?loja=51&ean=${barcode}`,
+      // Buscar áudio do produto via proxy (sem CORS)
+      const audioResponse = await fetch(
+        `/api/produto/codbar/${barcode}/audio_detalhe`,
         {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+            'Content-Type': 'application/json'
+          }
         }
       );
 
-      console.log('Status da consulta:', response.status);
+      let audioUrl = '';
+      if (audioResponse.ok) {
+        const audioResult: AudioResponse = await audioResponse.json();
+        audioUrl = audioResult.audio_url;
+      }
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          console.log('Token expirado, tentando reautenticar...');
-          // Token expirado, tentar autenticar novamente
-          localStorage.removeItem(TOKEN_KEY);
-          localStorage.removeItem(TOKEN_TIMESTAMP_KEY);
-          token = await authenticate();
-          if (token) {
-            console.log('Tentando consulta novamente com novo token...');
-            return await getProduct(barcode);
+      // Função para obter token da Mupa
+      const getMupaToken = async (): Promise<string | null> => {
+        const TOKEN_KEY = 'mupa_token';
+        const TOKEN_EXP_KEY = 'mupa_token_exp';
+        const now = Date.now();
+        const cachedToken = localStorage.getItem(TOKEN_KEY);
+        const cachedExp = localStorage.getItem(TOKEN_EXP_KEY);
+        if (cachedToken && cachedExp && now < parseInt(cachedExp, 10)) {
+          return cachedToken;
+        }
+        // Buscar novo token
+        const loginResp = await fetch('http://srv-mupa.ddns.net:5050/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            username: 'antunes@mupa.app',
+            password: '#Mupa04051623$'
+          })
+        });
+        if (!loginResp.ok) return null;
+        const loginData = await loginResp.json();
+        if (loginData && loginData.access_token) {
+          try {
+            localStorage.setItem(TOKEN_KEY, loginData.access_token);
+            localStorage.setItem(TOKEN_EXP_KEY, (now + 3500 * 1000).toString());
+          } catch {}
+          return loginData.access_token;
+        }
+        return null;
+      };
+
+      // Buscar imagem do produto na API Mupa via proxy
+      let mupaImageUrl = '';
+      let productCores = undefined;
+      try {
+        const mupaToken = await getMupaToken();
+        if (mupaToken) {
+          const mupaResponse = await fetch(
+            `/produto-imagem/${barcode}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${mupaToken}`
+              }
+            }
+          );
+          if (mupaResponse.ok) {
+            const mupaData = await mupaResponse.json();
+            if (mupaData && mupaData.imagem_url) {
+              mupaImageUrl = mupaData.imagem_url;
+            }
+            if (mupaData && mupaData.cores) {
+              productCores = mupaData.cores;
+            }
           }
         }
-        const errorText = await response.text();
-        console.error('Erro na consulta:', errorText);
-        setError(`Produto não encontrado: ${response.status}`);
-        setLoading(false);
-        return null;
+      } catch (e) {
+        // Se der erro, ignora e usa o fallback
       }
 
-      const result: ZaffariResponse = await response.json();
-      console.log('Resposta da consulta:', result);
-      
-      if (!result.success || !result.data) {
-        console.error('Produto não encontrado na resposta');
-        setError('Produto não encontrado');
-        setLoading(false);
-        return null;
-      }
-
-      const zaffariProduct = result.data;
+      // Converter para o formato Product esperado pelo sistema
       const product: Product = {
-        id: zaffariProduct.codigo_produto,
-        barcode: zaffariProduct.ean,
-        name: zaffariProduct.descricao_produto,
-        description: zaffariProduct.descricao_produto,
-        imageUrl: zaffariProduct.link_imagem || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=400&fit=crop',
-        normalPrice: parseFloat(zaffariProduct.preco_base),
-        isOnSale: false,
-        unit: zaffariProduct.embalagem_venda || 'UN',
-        additionalInfo: `Código: ${zaffariProduct.codigo_produto}`,
+        id: productData.codbar,
+        barcode: productData.codbar,
+        name: productData.descricao,
+        description: productData.descricao,
+        imageUrl: mupaImageUrl || productData.imagem_url,
+        // Para tipo "preco_de_por": preco_principal é o POR (promocional), preco_secundario é o DE (original)
+        normalPrice: productData.tipo_preco === 'POR' ? productData.preco_secundario : productData.preco_principal,
+        isOnSale: productData.tem_promocao,
+        salePrice: productData.tipo_preco === 'POR' ? productData.preco_principal : productData.preco_secundario,
+        unit: 'UN',
+        additionalInfo: productData.texto_detalhes,
+        audioUrl: audioUrl,
+        displayInfo: {
+          backgroundColor: productData.exibicao.cor_fundo,
+          style: productData.exibicao.estilo,
+          highlightText: productData.exibicao.texto_destaque,
+          primaryText: productData.exibicao.texto_primario,
+          secondaryText: productData.exibicao.texto_secundario,
+          tipo_preco: productData.tipo_preco,
+          tipo_oferta: productData.tipo_oferta,
+          dominante: productCores?.dominante,
+          secundaria: productCores?.secundaria,
+          terciaria: productCores?.terciaria,
+          quaternaria: productCores?.quaternaria
+        }
       };
 
       console.log('Produto processado:', product);
