@@ -3,14 +3,17 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { ProductSearch } from './components/ProductSearch';
 import SystemLogs from "./pages/SystemLogs";
-import ConfigTestPage from "./pages/ConfigTest";
+import ConfigTest from "./pages/ConfigTest";
+import Admin from "./pages/Admin";
+import FirebaseTest from "./pages/FirebaseTest";
 import { LogProvider } from "./contexts/LogContext";
 import { AudioProvider } from "./contexts/AudioContext";
 import AudioTest from "./components/AudioTest";
+import KioskApp from './components/KioskApp';
+import Index from "./pages/Index";
 import "./App.css";
 
 const queryClient = new QueryClient();
@@ -28,8 +31,9 @@ const App = () => (
               <Route path="/product-search" element={<ProductSearch />} />
               <Route path="/audio-test" element={<AudioTest />} />
               <Route path="/logs" element={<SystemLogs />} />
-              <Route path="/config-test" element={<ConfigTestPage />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="/config-test" element={<ConfigTest />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/firebase-test" element={<FirebaseTest />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

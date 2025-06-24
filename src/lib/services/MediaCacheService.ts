@@ -311,6 +311,26 @@ class MediaCacheService {
     // Online: cachear e retornar
     return this.cacheMedia(url, type);
   }
+
+  async clearCache(): Promise<void> {
+    if (!this.db) await this.initDB();
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction([this.storeName], 'readwrite');
+      const store = transaction.objectStore(this.storeName);
+      const request = store.clear();
+
+      request.onsuccess = () => {
+        console.log('✅ Cache limpo com sucesso');
+        resolve();
+      };
+
+      request.onerror = () => {
+        console.error('❌ Erro ao limpar cache:', request.error);
+        reject(request.error);
+      };
+    });
+  }
 }
 
 export const mediaCacheService = new MediaCacheService();

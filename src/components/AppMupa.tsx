@@ -50,10 +50,89 @@ const AppMupa = () => {
   // Estado para a atualização em background
   const [isUpdating, setIsUpdating] = useState(false);
   const lastUpdateTimeUpdate = useRef<string | null>(null);
+  const lastUpdateHour = useRef<number | null>(null);
 
   const debouncedStopAudio = useCallback(debounce(() => {
     stopCurrentAudio();
   }, 300), [stopCurrentAudio]);
+
+  // Função para verificar se é hora de atualizar
+  const shouldUpdate = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Lista de horários para atualização
+    const updateHours = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+    
+    // Se já atualizou nesta hora, não atualizar novamente
+    if (lastUpdateHour.current === currentHour) {
+      return false;
+    }
+    
+    // Verificar se a hora atual está na lista de horários de atualização
+    if (updateHours.includes(currentHour)) {
+      lastUpdateHour.current = currentHour;
+      return true;
+    }
+    
+    return false;
+  };
+
+  // Efeito para verificar atualizações automáticas
+  useEffect(() => {
+    if (!config.selectedGroupId || mode !== 'media') return;
+
+    const checkForUpdates = async () => {
+      if (shouldUpdate()) {
+        console.log(`🕒 Iniciando atualização automática às ${new Date().toLocaleTimeString()}`);
+        try {
+          setIsUpdating(true);
+          const response = await MediaService.getMediasByGroupId(config.selectedGroupId);
+          
+          if (!response.success) {
+            throw new Error(response.message || 'Erro ao atualizar mídias');
+          }
+
+          const newMedias = response.data?.response?.medias || [];
+          
+          // Limpar cache antigo
+          await mediaCacheService.clearCache();
+          
+          // Cachear novas mídias
+          const cachePromises = newMedias.map(media => {
+            const mediaUrl = media.url_download || media.link || media.final || media.url || '';
+            if (mediaUrl) {
+              const mediaType = media.type || (mediaUrl.includes('.mp4') ? 'video' : 'image');
+              return mediaCacheService.cacheMedia(mediaUrl, mediaType);
+            }
+            return Promise.resolve();
+          });
+          
+          await Promise.all(cachePromises);
+
+          // Atualizar playlist
+          setConfig(prevConfig => ({
+            ...prevConfig,
+            mediaPlaylist: newMedias
+          }));
+
+          console.log(`✅ Atualização automática concluída às ${new Date().toLocaleTimeString()}`);
+        } catch (error) {
+          console.error('❌ Erro na atualização automática:', error);
+        } finally {
+          setIsUpdating(false);
+        }
+      }
+    };
+
+    // Verificar a cada minuto
+    const interval = setInterval(checkForUpdates, 60000);
+
+    // Verificar imediatamente na montagem
+    checkForUpdates();
+
+    return () => clearInterval(interval);
+  }, [config.selectedGroupId, mode]);
 
   // Listener do Firebase para atualizações em tempo real
   useEffect(() => {
@@ -64,33 +143,50 @@ const AppMupa = () => {
     const groupId = config.selectedGroupId;
     const updateRef = ref(database, groupId);
 
+    console.log(`🔌 Conectando listener do Firebase para o grupo ${groupId}...`);
+
     const listener = onValue(updateRef, (snapshot) => {
       const data = snapshot.val();
       if (data && data.time_update) {
-        if (lastUpdateTimeUpdate.current && lastUpdateTimeUpdate.current === data.time_update) {
-          console.log('🔄 Firebase: time_update é o mesmo, ignorando atualização.');
-          return;
-        }
-
-        console.log(`🔥 Firebase: Recebido sinal de atualização para o grupo ${groupId} com time_update: ${data.time_update}`);
-        lastUpdateTimeUpdate.current = data.time_update;
+        console.log(`🔥 Firebase: Recebido time_update: ${data.time_update}, último: ${lastUpdateTimeUpdate.current}`);
         
-        // Iniciar atualização em background
-        const syncInBackground = async () => {
-          setIsUpdating(true);
-          try {
-            const response = await MediaService.getMediasByGroupId(groupId);
-            if (response.success && response.data?.response?.medias) {
+        // Se não houver último update ou se o update for diferente
+        if (!lastUpdateTimeUpdate.current || lastUpdateTimeUpdate.current !== data.time_update) {
+          console.log(`🔄 Firebase: Novo time_update detectado. Iniciando atualização...`);
+          lastUpdateTimeUpdate.current = data.time_update;
+          
+          // Iniciar atualização em background
+          const syncInBackground = async () => {
+            setIsUpdating(true);
+            try {
+              console.log('🔄 Iniciando busca de mídias do grupo...');
+              const response = await MediaService.getMediasByGroupId(groupId);
+              
+              if (!response.success) {
+                throw new Error(`Erro na resposta: ${response.message || 'Erro desconhecido'}`);
+              }
+              
+              if (!response.data?.response?.medias) {
+                throw new Error('Resposta não contém mídias');
+              }
+
               const newMedias = response.data.response.medias;
               console.log(`🔄 Atualização: ${newMedias.length} novas mídias encontradas. Iniciando cache em background...`);
+
+              // Limpar cache antigo antes de cachear novas mídias
+              await mediaCacheService.clearCache();
+              console.log('🧹 Cache antigo limpo.');
 
               // Cachear todas as novas mídias em background e aguardar a conclusão
               const cachePromises = newMedias.map(media => {
                 const mediaUrl = media.url_download || media.link || media.final || media.url || '';
                 if (mediaUrl) {
-                   const mediaType = media.type || (mediaUrl.includes('.mp4') ? 'video' : 'image');
-                   // cacheMedia agora retorna uma URL (blob ou original), mas o importante é que ela salva no cache
-                   return mediaCacheService.cacheMedia(mediaUrl, mediaType);
+                  const mediaType = media.type || (mediaUrl.includes('.mp4') ? 'video' : 'image');
+                  return mediaCacheService.cacheMedia(mediaUrl, mediaType)
+                    .catch(error => {
+                      console.error(`❌ Erro ao cachear mídia ${mediaUrl}:`, error);
+                      return null;
+                    });
                 }
                 return Promise.resolve();
               });
@@ -104,16 +200,24 @@ const AppMupa = () => {
                 mediaPlaylist: newMedias
               }));
               console.log('✅ Playlist atualizada em background com sucesso!');
+            } catch (error) {
+              console.error('❌ Erro durante a sincronização em background:', error);
+            } finally {
+              setIsUpdating(false);
             }
-          } catch (error) {
-            console.error('❌ Erro durante a sincronização em background:', error);
-          } finally {
-            setIsUpdating(false);
-          }
-        };
+          };
 
-        syncInBackground();
+          // Executar a sincronização
+          syncInBackground().catch(error => {
+            console.error('❌ Erro ao executar sincronização:', error);
+            setIsUpdating(false);
+          });
+        } else {
+          console.log('🔄 Firebase: time_update é o mesmo, ignorando atualização.');
+        }
       }
+    }, (error) => {
+      console.error('❌ Erro no listener do Firebase:', error);
     });
 
     // Função de limpeza para remover o listener
@@ -121,8 +225,7 @@ const AppMupa = () => {
       console.log(`🔌 Desconectando listener do Firebase para o grupo ${groupId}.`);
       off(updateRef, 'value', listener);
     };
-
-  }, [mode, config.selectedGroupId]);
+  }, [mode, config.selectedGroupId, mediaCacheService]);
 
   // Foca o input após interação do usuário
   useEffect(() => {
@@ -213,7 +316,7 @@ const AppMupa = () => {
 
   // Show config screen if not configured OR if no group is selected
   if (!config.selectedGroupId) {
-    return <ConfigScreen isActive={true} onConfigSave={handleConfigSave} />;
+    return <ConfigScreen isActive={true} onConfigSave={handleConfigSave} onCancel={switchToMedia} />;
   }
 
   console.log('Layout ativo:', config.activeLayout);
@@ -261,6 +364,7 @@ const AppMupa = () => {
       <ConfigScreen 
         isActive={mode === 'config'} 
         onConfigSave={handleConfigSave}
+        onCancel={switchToMedia}
       />
 
       {/* Botão de configuração - apenas no modo mídia */}
