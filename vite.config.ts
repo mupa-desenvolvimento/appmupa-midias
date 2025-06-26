@@ -4,8 +4,8 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 const DEFAULT_CONFIG = {
-  apiHost: '192.168.1.4',
-  apiPort: 3000,
+  apiHost: '127.0.0.1',
+  apiPort: 5555,
 };
 
 // https://vitejs.dev/config/
@@ -18,12 +18,13 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: 5678,
-      strictPort: true, // Força o uso da porta especificada
+      strictPort: true,
+      allowedHosts: ["srv-mupa.ddns.net"],
       proxy: {
         '/api': {
           target: apiUrl,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '/api'),
+          rewrite: (path) => path.replace(/^\/api/, ''),
           secure: false,
           ws: true,
           timeout: 10000,
@@ -106,6 +107,16 @@ export default defineConfig(({ mode }) => {
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization'
           }
+        },
+        '/storage': {
+          target: 'http://localhost:5555',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/uploads': {
+          target: 'http://localhost:5555',
+          changeOrigin: true,
+          secure: false,
         }
       },
     },

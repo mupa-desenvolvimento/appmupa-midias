@@ -33,6 +33,7 @@ import {
   Users as UsersIcon,
   Bell
 } from 'lucide-react';
+import { DeviceList } from '@/components/DeviceList';
 
 interface SystemStats {
   totalEmpresas: number;
@@ -424,42 +425,7 @@ const AdminPage = () => {
                 </Button>
               </div>
 
-              <div className="grid gap-4 w-full">
-                {filteredDispositivos.map((dispositivo) => (
-                  <Card key={dispositivo._id} className="hover:shadow-md transition-shadow w-full">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <Monitor className="w-6 h-6 text-purple-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-gray-900">{dispositivo.nome}</h3>
-                            <p className="text-sm text-gray-500">Código: {dispositivo.codigo}</p>
-                            <div className="flex items-center space-x-4 mt-1">
-                              <span className="text-sm text-gray-600">{dispositivo.grupo}</span>
-                              <span className="text-sm text-gray-600">IP: {dispositivo.ip}</span>
-                              <span className="text-sm text-gray-600">v{dispositivo.versao}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          {getStatusBadge(dispositivo.status)}
-                          <Button variant="outline" size="sm">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <DeviceList />
             </div>
           )}
 

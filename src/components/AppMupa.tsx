@@ -41,6 +41,15 @@ const AppMupa = () => {
   const [isConfigScreen, setIsConfigScreen] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [barcodeValue, setBarcodeValue] = useState('');
+  const [deviceSerial] = useState(() => {
+    // Gera um serial único para o dispositivo se não existir
+    const existingSerial = localStorage.getItem('device_serial');
+    if (existingSerial) return existingSerial;
+    
+    const newSerial = `MUPA-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+    localStorage.setItem('device_serial', newSerial);
+    return newSerial;
+  });
 
   // Estados para o pop-up de autenticação de config
   const [isConfigAuthOpen, setIsConfigAuthOpen] = useState(false);
@@ -346,11 +355,14 @@ const AppMupa = () => {
       />
 
       {/* Media Player */}
-      <MediaPlayer 
-        isActive={mode === 'media'}
-        playlist={config.mediaPlaylist || []}
-        groupId={config.selectedGroupId}
-      />
+      {mode === 'media' && (
+        <MediaPlayer
+          isActive={true}
+          playlist={config.mediaPlaylist || []}
+          groupId={config.selectedGroupId}
+          deviceSerial={deviceSerial}
+        />
+      )}
 
       {/* Consultation Screen */}
       <ConsultationScreen 

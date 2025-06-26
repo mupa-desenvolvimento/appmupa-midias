@@ -2,12 +2,14 @@ import { useMediaPlaylist } from '../hooks/useMediaPlaylist';
 import { MediaItem } from '../types';
 import { useEffect, useState } from 'react';
 import { useMediaCache } from '../hooks/useMediaCache';
+import { useDeviceStatus } from '../hooks/useDeviceStatus';
 import { cn } from '@/lib/utils';
 
 interface MediaPlayerProps {
   isActive: boolean;
   playlist: MediaItem[];
   groupId?: string;
+  deviceSerial: string;
 }
 
 // Sub-componente para renderizar uma única instância de mídia (imagem ou vídeo)
@@ -56,15 +58,42 @@ const MediaElement = ({
   );
 };
 
-const MediaPlayer = ({ isActive, playlist, groupId }: MediaPlayerProps) => {
+const MediaPlayer = ({ isActive, playlist, groupId, deviceSerial }: MediaPlayerProps) => {
   const { currentMedia, nextMedia } = useMediaPlaylist(playlist, { groupId });
+  const { updateStatus } = useDeviceStatus(deviceSerial);
   
   const [activePlayer, setActivePlayer] = useState<'A' | 'B'>('A');
   const [mediaA, setMediaA] = useState<MediaItem | null>(null);
   const [mediaB, setMediaB] = useState<MediaItem | null>(null);
+  const [lastHeartbeat, setLastHeartbeat] = useState<Date>(new Date());
 
   const { cachedUrl: cachedUrlA, isLoading: isLoadingA } = useMediaCache(mediaA?.url || null, mediaA?.type || 'image');
   const { cachedUrl: cachedUrlB, isLoading: isLoadingB } = useMediaCache(mediaB?.url || null, mediaB?.type || 'image');
+
+  // Atualiza o status do dispositivo quando a mídia muda
+  useEffect(() => {
+    if (currentMedia) {
+      updateStatus('online');
+      setLastHeartbeat(new Date());
+    }
+  }, [currentMedia, updateStatus]);
+
+  // Monitora o status do dispositivo
+  useEffect(() => {
+    const checkStatus = () => {
+      const now = new Date();
+      const timeSinceLastHeartbeat = now.getTime() - lastHeartbeat.getTime();
+      
+      // Se não houver atualização por mais de 30 segundos, marca como offline
+      if (timeSinceLastHeartbeat > 30000) {
+        updateStatus('offline');
+      }
+    };
+
+    const interval = setInterval(checkStatus, 10000); // Verifica a cada 10 segundos
+
+    return () => clearInterval(interval);
+  }, [lastHeartbeat, updateStatus]);
 
   // Carrega a mídia no player inativo
   useEffect(() => {
@@ -113,14 +142,22 @@ const MediaPlayer = ({ isActive, playlist, groupId }: MediaPlayerProps) => {
           cachedUrl={cachedUrlA} 
           isLoading={isLoadingA} 
           isActive={activePlayer === 'A'} 
-          onVideoEnded={nextMedia}
+          onVideoEnded={() => {
+            nextMedia();
+            updateStatus('online');
+            setLastHeartbeat(new Date());
+          }}
         />
         <MediaElement 
           media={mediaB} 
           cachedUrl={cachedUrlB} 
           isLoading={isLoadingB} 
           isActive={activePlayer === 'B'} 
-          onVideoEnded={nextMedia}
+          onVideoEnded={() => {
+            nextMedia();
+            updateStatus('online');
+            setLastHeartbeat(new Date());
+          }}
         />
       </div>
 

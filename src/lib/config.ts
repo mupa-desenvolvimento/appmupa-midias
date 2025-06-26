@@ -290,4 +290,17 @@ export const ConfigManager = {
     
     console.groupEnd();
   }
+};
+
+export const API_CONFIG = {
+  baseURL: process.env.NODE_ENV === 'production' 
+    ? 'http://srv-mupa.ddns.net:5678'
+    : 'http://localhost:5555',
+  endpoints: {
+    storage: {
+      upload: '/storage/upload',
+      list: '/storage/arquivos',
+      download: '/storage/download'
+    }
+  }
 }; 

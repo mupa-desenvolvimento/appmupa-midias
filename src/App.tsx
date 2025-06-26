@@ -14,7 +14,14 @@ import { AudioProvider } from "./contexts/AudioContext";
 import AudioTest from "./components/AudioTest";
 import KioskApp from './components/KioskApp';
 import Index from "./pages/Index";
+import Devices from "./pages/Devices";
 import "./App.css";
+import { DeviceList } from '@/components/DeviceList';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import AppMupa from './components/AppMupa';
+import Storage from './pages/Storage';
+import StorageLoja from './pages/StorageLoja';
 
 const queryClient = new QueryClient();
 
@@ -27,13 +34,16 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<AppMupa />} />
+              <Route path="/devices" element={<Devices />} />
               <Route path="/product-search" element={<ProductSearch />} />
               <Route path="/audio-test" element={<AudioTest />} />
               <Route path="/logs" element={<SystemLogs />} />
               <Route path="/config-test" element={<ConfigTest />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/firebase-test" element={<FirebaseTest />} />
+              <Route path="/storage" element={<Storage />} />
+              <Route path="/storage/loja" element={<StorageLoja />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

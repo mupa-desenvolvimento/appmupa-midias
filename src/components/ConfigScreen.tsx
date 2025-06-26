@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, QrCode, Wifi, WifiOff, RotateCcw, ChevronLeft, ChevronRight, Check, Monitor, Network, Wrench, Database, User, Users, Library, CheckCircle2, CloudDownload } from 'lucide-react';
+import { Settings, QrCode, Wifi, WifiOff, RotateCcw, ChevronLeft, ChevronRight, Check, Monitor, Network, Wrench, Database, User, Users, Library, CheckCircle2, CloudDownload, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -14,6 +14,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Card, CardContent } from './ui/card';
 import { cn } from '@/lib/utils';
 import { Progress } from './ui/progress';
+import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel } from './ui/alert-dialog';
 
 interface ConfigScreenProps {
   isActive: boolean;
@@ -40,6 +41,8 @@ const ConfigScreen = ({ isActive, onConfigSave, onCancel }: ConfigScreenProps) =
   const [downloadStats, setDownloadStats] = useState({ total: 0, current: 0, currentMediaName: '' });
   const [error, setError] = useState<string | null>(null);
   const [deviceNickname, setDeviceNickname] = useState('');
+  const [configFinalizada, setConfigFinalizada] = useState(false);
+  const [showClearCache, setShowClearCache] = useState(false);
 
   type MediaStatus = 'idle' | 'loading' | 'downloading' | 'success' | 'error';
 
@@ -411,18 +414,44 @@ const ConfigScreen = ({ isActive, onConfigSave, onCancel }: ConfigScreenProps) =
     }
   }, [isActive]);
 
-  const handleSave = () => {
-    hideKeyboard(); // Ocultar teclado ao salvar
-    const finalConfig: SystemConfig = {
-      ...config,
-      deviceNickname: deviceNickname
-    };
-    
-    // Salvar configuração final
-    ConfigManager.saveConfig(finalConfig);
-    onConfigSave(finalConfig);
-    
-    addLog('✅ Configuração salva e terminal ativado!', 'success');
+  const handleSave = async () => {
+    hideKeyboard();
+    try {
+      // Gera um serial se não existir
+      let serial = config.deviceId;
+      if (!serial) {
+        if (window.crypto?.randomUUID) {
+          serial = window.crypto.randomUUID();
+        } else {
+          serial = Math.random().toString(36).substring(2, 15);
+        }
+      }
+      addLog(`Enviando para backend: serial=${serial}, apelido=${config.deviceNickname}, empresa=${config.empresaId}, coduser=${config.codUser}`, 'info');
+      const apiUrl = `/api/dispositivos`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          serial,
+          status: 'online',
+          apelido: config.deviceNickname,
+          empresa: config.empresaId,
+          coduser: config.codUser
+        })
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || 'Erro ao cadastrar dispositivo');
+      const finalConfig = {
+        ...config,
+        deviceId: data.dispositivo.serial
+      };
+      ConfigManager.saveConfig(finalConfig);
+      onConfigSave(finalConfig);
+      setConfigFinalizada(true);
+      addLog('✅ Dispositivo cadastrado e ativado!', 'success');
+    } catch (err) {
+      addLog('❌ Erro ao cadastrar dispositivo: ' + (err.message || err), 'error');
+    }
   };
 
   const handleInputChange = (field: keyof SystemConfig, value: string | number) => {
@@ -587,7 +616,7 @@ const ConfigScreen = ({ isActive, onConfigSave, onCancel }: ConfigScreenProps) =
     <div className="space-y-4 w-full max-w-3xl mx-auto">
       <div className="text-center mb-8">
         <User className="w-16 h-16 mx-auto text-primary mb-4" />
-        <h3 className="text-2xl font-bold">Identificação do Terminal</h3>
+        <h3 className="text-2xl font-bold">Identificação do Dispositivo</h3>
         <p className="text-muted-foreground mt-2">Configure as informações básicas do dispositivo</p>
         </div>
 
@@ -618,7 +647,7 @@ const ConfigScreen = ({ isActive, onConfigSave, onCancel }: ConfigScreenProps) =
                 ) : (
                   <>
                     <QrCode className="w-4 h-4 mr-2" />
-                    Testar
+                    Acessar App
                   </>
                 )}
             </Button>
@@ -632,7 +661,7 @@ const ConfigScreen = ({ isActive, onConfigSave, onCancel }: ConfigScreenProps) =
             <>
               <div className="bg-primary/10 p-6 rounded-xl border border-primary/20 text-center space-y-3">
                 <p className="text-xl font-semibold text-primary">
-                  🎉 Seja bem-vindo, {codUserResponse.response['dados-user'].nome_usuario}, ao terminal inteligente Mupa!
+                  🎉 Seja bem-vindo, {codUserResponse.response['dados-user'].nome_usuario}, ao dispositivo inteligente Mupa!
                 </p>
                 <p className="text-muted-foreground">
                   Aqui você consulta preços, descobre promoções do seu CPF e ainda recebe sugestões feitas só pra você.
@@ -673,7 +702,7 @@ const ConfigScreen = ({ isActive, onConfigSave, onCancel }: ConfigScreenProps) =
               className="text-lg py-4 px-4 rounded-xl border-2"
               />
             <p className="text-sm text-muted-foreground mt-2">
-              Nome amigável para identificar este terminal
+              Nome amigável para identificar este dispositivo
           </p>
             </div>
         </div>
@@ -815,7 +844,7 @@ const ConfigScreen = ({ isActive, onConfigSave, onCancel }: ConfigScreenProps) =
       <div className="text-center mb-8">
         <CheckCircle2 className="w-16 h-16 mx-auto text-primary mb-4" />
         <h3 className="text-2xl font-bold">Configuração Concluída</h3>
-        <p className="text-muted-foreground mt-2">Revise as informações e ative o terminal</p>
+        <p className="text-muted-foreground mt-2">Revise as informações e ative o dispositivo</p>
       </div>
 
       <div className="bg-muted/40 p-6 rounded-xl border border-border">
@@ -834,20 +863,71 @@ const ConfigScreen = ({ isActive, onConfigSave, onCancel }: ConfigScreenProps) =
         </Button>
         <Button size="lg" onClick={handleSave} className="text-lg px-8 py-6 bg-green-600 hover:bg-green-700">
           <Check className="w-5 h-5 mr-2" />
-          Ativar Terminal
+          Ativar Dispositivo
         </Button>
       </div>
     </div>
   );
 
+  if (configFinalizada) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <img
+          src="https://3ae4eb7cd71d409c5fc6c7861ea69db9.cdn.bubble.io/f1673900178083x912413083967604100/Untitled-1.svg"
+          alt="Logo Mupa"
+          className="w-32 h-32 mb-6"
+          style={{ maxWidth: 160 }}
+        />
+        <CheckCircle2 className="w-16 h-16 text-green-600 mb-4" />
+        <h2 className="text-2xl font-bold mb-2">
+          Bem-vindo, {config.userResponse?.nome_usuario || "usuário"}!
+        </h2>
+        <p className="text-lg mb-6">Seu dispositivo foi ativado com sucesso.</p>
+        <Button onClick={onCancel}>Fechar</Button>
+      </div>
+    );
+  }
+
   if (!isActive) return null;
 
   return (
-    <div className="dark flex h-screen bg-background text-foreground">
+    <div className="relative dark flex h-screen bg-background text-foreground">
+      {/* Botão de limpar cache no topo direito */}
+      <div className="absolute top-6 right-6 z-50">
+        <AlertDialog open={showClearCache} onOpenChange={setShowClearCache}>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full" title="Limpar Cache" onClick={() => setShowClearCache(true)}>
+              <Trash2 className="w-6 h-6" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Limpar cache?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Isso irá remover todas as configurações salvas e recarregar a página. Tem certeza que deseja continuar?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { localStorage.clear(); window.location.reload(); }}>Limpar e Recarregar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
       {/* Sidebar */}
       <div className="w-80 bg-muted/40 border-r border-border p-8 flex flex-col justify-between">
         <div>
-          <h1 className="text-2xl font-bold mb-10">Configuração do Kiosk</h1>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col items-center">
+              <img
+                src="https://3ae4eb7cd71d409c5fc6c7861ea69db9.cdn.bubble.io/f1673900178083x912413083967604100/Untitled-1.svg"
+                alt="Logo Mupa"
+                className="w-44 h-44 mb-2"
+                style={{ maxWidth: 200 }}
+              />
+            </div>
+          </div>
+          <h1 className="text-xl font-semibold mb-10 text-center">Configuração App Mupa</h1>
           <nav className="space-y-4">
             {steps.map((step) => {
               const isStepActive = currentStep === step.id;

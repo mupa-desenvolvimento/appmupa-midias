@@ -3,9 +3,12 @@ const sqlite3 = require('sqlite3').verbose();
 const cron = require('node-cron');
 const axios = require('axios');
 const path = require('path');
+const cors = require('cors');
+const multer = require('multer');
+const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5555;
 
 // Middleware
 app.use(express.json());
@@ -38,6 +41,104 @@ const API_CONFIG = {
     'Content-Type': 'application/json'
   }
 };
+
+// Configuração do multer para upload de arquivos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // Cria diretório base de uploads se não existir
+    const baseDir = './uploads';
+    if (!fs.existsSync(baseDir)) {
+      fs.mkdirSync(baseDir);
+    }
+
+    // Cria diretório para o tipo de arquivo
+    let fileType = 'outros';
+    if (file.mimetype.startsWith('image/')) fileType = 'imagens';
+    else if (file.mimetype.startsWith('video/')) fileType = 'videos';
+    else if (file.mimetype.startsWith('audio/')) fileType = 'audios';
+    else if (file.mimetype.startsWith('text/')) fileType = 'documentos';
+    else if (file.mimetype.includes('pdf')) fileType = 'documentos';
+    else if (file.mimetype.includes('word')) fileType = 'documentos';
+    else if (file.mimetype.includes('excel')) fileType = 'documentos';
+    else if (file.originalname.toLowerCase().endsWith('.apk')) fileType = 'aplicativos';
+
+    const typeDir = path.join(baseDir, fileType);
+    if (!fs.existsSync(typeDir)) {
+      fs.mkdirSync(typeDir);
+    }
+
+    // Cria diretório para o mês atual
+    const date = new Date();
+    const monthDir = path.join(typeDir, `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`);
+    if (!fs.existsSync(monthDir)) {
+      fs.mkdirSync(monthDir);
+    }
+
+    cb(null, monthDir);
+  },
+  filename: function (req, file, cb) {
+    // Remove caracteres especiais e espaços do nome original
+    const cleanName = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_').toLowerCase();
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + cleanName);
+  }
+});
+
+// Configuração do multer com limites e filtros
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB
+    files: 1
+  },
+  fileFilter: (req, file, cb) => {
+    // Lista de tipos MIME permitidos
+    const allowedMimes = [
+      // Aplicativos
+      'application/vnd.android.package-archive',
+      'application/x-msdownload',
+      'application/x-msdos-program',
+      // Imagens
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      // Vídeos
+      'video/mp4',
+      'video/quicktime',
+      'video/x-msvideo',
+      // Áudios
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      // Documentos
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      // Outros
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/x-rar-compressed'
+    ];
+
+    // Permitir APK mesmo que o MIME type não seja reconhecido corretamente
+    if (file.originalname.toLowerCase().endsWith('.apk')) {
+      cb(null, true);
+      return;
+    }
+
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de arquivo não permitido'));
+    }
+  }
+});
+
+// Middleware para servir arquivos estáticos
+app.use('/uploads', express.static('uploads'));
 
 // Função para buscar uma página de mídias
 async function fetchMediasPage(offset = 0) {
@@ -97,6 +198,74 @@ function initializeDatabase() {
       db.run('CREATE INDEX IF NOT EXISTS idx_grupo_lojas ON midias(grupo_lojas)');
       db.run('CREATE INDEX IF NOT EXISTS idx_ativado ON midias(ativado)');
       db.run('CREATE INDEX IF NOT EXISTS idx_inicia_final ON midias(inicia, final)');
+
+      // Dropar e recriar a tabela dispositivos
+      db.run('DROP TABLE IF EXISTS dispositivos', (err) => {
+        if (err) {
+          console.error('Erro ao dropar tabela dispositivos:', err);
+        } else {
+          console.log('✅ Tabela dispositivos removida com sucesso');
+          
+          // Criar a tabela com a nova estrutura
+          db.run(`
+            CREATE TABLE IF NOT EXISTS dispositivos (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              serial TEXT UNIQUE NOT NULL,
+              status TEXT DEFAULT 'offline',
+              apelido TEXT,
+              empresa TEXT,
+              coduser TEXT,
+              ultima_atualizacao DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `, (err) => {
+            if (err) {
+              console.error('Erro ao criar tabela dispositivos:', err);
+            } else {
+              console.log('✅ Tabela dispositivos criada com sucesso');
+              
+              // Criar índice
+              db.run(`
+                CREATE INDEX IF NOT EXISTS idx_dispositivos_serial 
+                ON dispositivos(serial)
+              `, (err) => {
+                if (err) {
+                  console.error('Erro ao criar índice dispositivos_serial:', err);
+                } else {
+                  console.log('✅ Índice dispositivos_serial criado com sucesso');
+                }
+              });
+            }
+          });
+        }
+      });
+
+      // Tabela de arquivos
+      db.run(`
+        CREATE TABLE IF NOT EXISTS arquivos (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          nome TEXT NOT NULL,
+          nome_original TEXT NOT NULL,
+          descricao TEXT,
+          tipo TEXT NOT NULL,
+          tamanho INTEGER NOT NULL,
+          caminho TEXT NOT NULL,
+          url TEXT NOT NULL,
+          downloads INTEGER DEFAULT 0,
+          data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          categoria TEXT,
+          subcategoria TEXT,
+          tags TEXT,
+          status TEXT DEFAULT 'ativo',
+          tipo_arquivo TEXT NOT NULL,
+          versao TEXT
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Erro ao criar tabela arquivos:', err);
+        } else {
+          console.log('✅ Tabela arquivos criada/verificada com sucesso');
+        }
+      });
     });
   });
 }
@@ -509,6 +678,353 @@ cron.schedule('0 * * * *', () => {
   sincronizarMidias();
 });
 
+// Endpoint para cadastrar dispositivo
+app.post('/dispositivos', (req, res) => {
+  const { apelido, empresa, coduser } = req.body;
+  if (!apelido || !coduser) {
+    return res.status(400).json({ success: false, error: 'Apelido e coduser são obrigatórios' });
+  }
+
+  // Gerar serial único (UUID v4 simples)
+  const serial = 'xxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+
+  // Status inicial: online
+  const status = 'online';
+
+  // Inserir no banco
+  const stmt = db.prepare(`
+    INSERT INTO dispositivos (serial, status, apelido, empresa, coduser)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  stmt.run([serial, status, apelido, empresa || '', coduser], function(err) {
+    if (err) {
+      console.error('Erro ao cadastrar dispositivo:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    res.json({
+      success: true,
+      dispositivo: {
+        id: this.lastID,
+        serial,
+        status,
+        apelido,
+        empresa: empresa || '',
+        coduser
+      }
+    });
+  });
+  stmt.finalize();
+});
+
+// Endpoint para atualizar status do dispositivo
+app.put('/dispositivos/:serial/status', (req, res) => {
+  const { serial } = req.params;
+  const { status } = req.body;
+
+  console.log(`📱 Atualizando status do dispositivo ${serial} para ${status}`);
+
+  // Validação dos parâmetros
+  if (!serial || !status) {
+    console.error('❌ Serial e status são obrigatórios');
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Serial e status são obrigatórios' 
+    });
+  }
+
+  // Validação do status
+  if (!['online', 'offline'].includes(status)) {
+    console.error(`❌ Status inválido: ${status}`);
+    return res.status(400).json({
+      success: false,
+      error: 'Status deve ser "online" ou "offline"'
+    });
+  }
+
+  // Primeiro verifica se o dispositivo existe
+  db.get('SELECT id FROM dispositivos WHERE serial = ?', [serial], (err, row) => {
+    if (err) {
+      console.error('❌ Erro ao verificar dispositivo:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+
+    if (!row) {
+      console.log(`📱 Dispositivo ${serial} não encontrado, criando novo registro...`);
+      // Se não existe, cria um novo dispositivo
+      db.run(`
+            INSERT INTO dispositivos (serial, status)
+            VALUES (?, ?)
+      `, [serial, status], function(err) {
+        if (err) {
+          console.error('❌ Erro ao criar dispositivo:', err);
+          return res.status(500).json({ success: false, error: err.message });
+        }
+        console.log(`✅ Novo dispositivo criado com sucesso: ${serial}`);
+        res.json({
+          success: true,
+          message: 'Novo dispositivo registrado com sucesso',
+          deviceId: this.lastID
+        });
+      });
+    } else {
+      // Se existe, atualiza o status
+      db.run(`
+        UPDATE dispositivos 
+        SET status = ?,
+            ultima_atualizacao = CURRENT_TIMESTAMP
+        WHERE serial = ?
+      `, [status, serial], function(err) {
+        if (err) {
+          console.error('❌ Erro ao atualizar status:', err);
+          return res.status(500).json({ success: false, error: err.message });
+        }
+
+        console.log(`✅ Status atualizado com sucesso: ${serial} -> ${status}`);
+        res.json({
+          success: true,
+          message: 'Status atualizado com sucesso',
+          changes: this.changes
+        });
+      });
+    }
+  });
+});
+
+// Endpoint para listar dispositivos
+app.get('/dispositivos', (req, res) => {
+  console.log('📱 Listando todos os dispositivos...');
+
+  const query = `
+    SELECT 
+      id,
+      serial,
+      status,
+      apelido,
+      empresa,
+      coduser,
+      ultima_atualizacao,
+      CASE 
+        WHEN status = 'online' AND (strftime('%s', 'now') - strftime('%s', ultima_atualizacao)) <= 30 
+        THEN 'online'
+        ELSE 'offline'
+      END as status_atual,
+      strftime('%Y-%m-%d %H:%M:%S', ultima_atualizacao) as ultima_atualizacao_formatada
+    FROM dispositivos
+    ORDER BY 
+      CASE WHEN status = 'online' THEN 0 ELSE 1 END,
+      ultima_atualizacao DESC
+  `;
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('❌ Erro ao listar dispositivos:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+
+    // Processa os resultados para adicionar informações adicionais
+    const devices = rows.map(device => {
+      const lastUpdate = new Date(device.ultima_atualizacao);
+      const now = new Date();
+      const diffInSeconds = Math.floor((now.getTime() - lastUpdate.getTime()) / 1000);
+
+      return {
+        ...device,
+        ultima_atualizacao_relativa: formatTimeAgo(diffInSeconds),
+        status_atual: device.status_atual,
+        online: device.status_atual === 'online'
+      };
+    });
+
+    console.log(`✅ ${devices.length} dispositivos encontrados`);
+    res.json({
+      success: true,
+      devices
+    });
+  });
+});
+
+// Função auxiliar para formatar o tempo decorrido
+function formatTimeAgo(seconds) {
+  if (seconds < 60) return `${seconds} segundos atrás`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutos atrás`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} horas atrás`;
+  return `${Math.floor(seconds / 86400)} dias atrás`;
+}
+
+// Endpoints para gerenciamento de arquivos
+
+// Upload de arquivo
+app.post('/storage/upload', upload.single('arquivo'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Nenhum arquivo enviado' 
+      });
+    }
+
+    // Determina o tipo de arquivo
+    let tipoArquivo = 'outro';
+    if (req.file.mimetype.startsWith('image/')) tipoArquivo = 'imagem';
+    else if (req.file.mimetype.startsWith('video/')) tipoArquivo = 'video';
+    else if (req.file.mimetype.startsWith('audio/')) tipoArquivo = 'audio';
+    else if (req.file.mimetype.startsWith('text/') || 
+             req.file.mimetype.includes('pdf') || 
+             req.file.mimetype.includes('word') || 
+             req.file.mimetype.includes('excel')) tipoArquivo = 'documento';
+    else if (req.file.originalname.toLowerCase().endsWith('.apk')) tipoArquivo = 'aplicativo';
+
+    // Prepara os dados para inserção
+    const fileData = {
+      nome: req.file.filename,
+      nome_original: req.file.originalname,
+      descricao: req.body.descricao || '',
+      tipo: req.body.categoria || 'outros',
+      tamanho: req.file.size,
+      caminho: req.file.path,
+      url: `/uploads/${req.file.filename}`,
+      categoria: req.body.categoria || 'outros',
+      subcategoria: req.body.subcategoria || '',
+      tags: req.body.tags || '',
+      tipo_arquivo: tipoArquivo,
+      versao: req.body.versao || null
+    };
+
+    // Insere o arquivo no banco de dados
+    const sql = `
+      INSERT INTO arquivos (
+        nome, nome_original, descricao, tipo, tamanho, 
+        caminho, url, categoria, subcategoria, tags, 
+        tipo_arquivo, versao
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    db.run(sql, [
+      fileData.nome,
+      fileData.nome_original,
+      fileData.descricao,
+      fileData.tipo,
+      fileData.tamanho,
+      fileData.caminho,
+      fileData.url,
+      fileData.categoria,
+      fileData.subcategoria,
+      fileData.tags,
+      fileData.tipo_arquivo,
+      fileData.versao
+    ], function(err) {
+      if (err) {
+        console.error('Erro ao inserir arquivo:', err);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Erro ao salvar arquivo no banco de dados' 
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Arquivo enviado com sucesso',
+        file: {
+          ...fileData,
+          id: this.lastID
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Erro no upload:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Erro desconhecido' 
+    });
+  }
+});
+
+// Listar arquivos
+app.get('/storage/arquivos', (req, res) => {
+  const { categoria, subcategoria, tipo, busca } = req.query;
+  let query = 'SELECT * FROM arquivos WHERE status = "ativo"';
+  const params = [];
+
+  if (categoria && categoria !== 'todos') {
+    query += ' AND categoria = ?';
+    params.push(categoria);
+  }
+
+  if (subcategoria) {
+    query += ' AND subcategoria = ?';
+    params.push(subcategoria);
+  }
+
+  if (tipo) {
+    query += ' AND tipo_arquivo = ?';
+    params.push(tipo);
+  }
+
+  if (busca) {
+    query += ' AND (nome_original LIKE ? OR descricao LIKE ? OR tags LIKE ?)';
+    const termoBusca = `%${busca}%`;
+    params.push(termoBusca, termoBusca, termoBusca);
+  }
+
+  query += ' ORDER BY data_upload DESC';
+
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('Erro ao listar arquivos:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+
+    // Agrupa arquivos por categoria
+    const arquivosAgrupados = rows.reduce((acc, arquivo) => {
+      const cat = arquivo.categoria || 'Sem Categoria';
+      if (!acc[cat]) {
+        acc[cat] = [];
+      }
+      acc[cat].push(arquivo);
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      arquivos: rows,
+      arquivosAgrupados
+    });
+  });
+});
+
+// Download de arquivo
+app.get('/storage/download/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.get('SELECT * FROM arquivos WHERE id = ?', [id], (err, arquivo) => {
+    if (err) {
+      console.error('Erro ao buscar arquivo:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+
+    if (!arquivo) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Arquivo não encontrado' 
+      });
+    }
+
+    // Incrementa contador de downloads
+    db.run('UPDATE arquivos SET downloads = downloads + 1 WHERE id = ?', [id]);
+
+    // Envia o arquivo
+    res.download(arquivo.caminho, arquivo.nome, (err) => {
+      if (err) {
+        console.error('Erro ao enviar arquivo:', err);
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    });
+  });
+});
+
 // Inicializar servidor
 async function startServer() {
   try {
@@ -518,29 +1034,23 @@ async function startServer() {
     console.log('🚀 Iniciando primeira sincronização...');
     await sincronizarMidias();
     
-    app.listen(PORT, () => {
-      console.log(`✅ Servidor rodando na porta ${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      const os = require('os');
+      const ifaces = os.networkInterfaces();
+      const ips = Object.values(ifaces).flat().filter(i => i.family === 'IPv4' && !i.internal).map(i => i.address);
+      console.log(`✅ Servidor rodando na porta ${PORT} e aceitando conexões externas`);
+      ips.forEach(ip => console.log(`➡️  Acesse: http://${ip}:${PORT}`));
       console.log(`📊 Endpoints disponíveis:`);
       console.log(`   GET  /midias/:grupo_lojas - Obter mídias filtradas`);
       console.log(`   POST /sincronizar-midias - Forçar sincronização`);
-      console.log(`   GET  /status - Status do servidor`);
-      console.log(`   GET  /stats - Estatísticas do banco`);
+      console.log(`   GET  /storage/arquivos - Listar arquivos`);
+      console.log(`   POST /storage/upload - Upload de arquivo`);
+      console.log(`   GET  /storage/download/:id - Download de arquivo`);
     });
-
   } catch (error) {
-    console.error('❌ Erro ao inicializar servidor:', error);
+    console.error('❌ Erro ao iniciar servidor:', error);
     process.exit(1);
   }
 }
 
-// Tratamento de erros não capturados
-process.on('uncaughtException', (error) => {
-  console.error('❌ Erro não capturado:', error);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Promise rejeitada não tratada:', reason);
-});
-
-// Iniciar servidor
-startServer(); 
+startServer();
